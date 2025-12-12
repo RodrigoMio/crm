@@ -15,6 +15,7 @@ export default function LeadsList() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [importResult, setImportResult] = useState<any>(null)
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
+  const [linhaInicial, setLinhaInicial] = useState<number>(2)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Busca lista de agentes (para filtro, apenas Admin)
@@ -80,9 +81,10 @@ export default function LeadsList() {
 
   // Mutation para importar planilha
   const importMutation = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async ({ file, linhaInicial }: { file: File; linhaInicial: number }) => {
       const formData = new FormData()
       formData.append('file', file)
+      formData.append('linhaInicial', linhaInicial.toString())
       const response = await api.post('/leads/import', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -139,7 +141,7 @@ export default function LeadsList() {
         alert('Arquivo muito grande. Tamanho máximo: 50MB')
         return
       }
-      importMutation.mutate(file)
+      importMutation.mutate({ file, linhaInicial })
     }
   }
 
@@ -410,6 +412,30 @@ export default function LeadsList() {
               Tamanho máximo: 50MB
             </p>
 
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+                Linha inicial para importação:
+              </label>
+              <input
+                type="number"
+                min="2"
+                value={linhaInicial}
+                onChange={(e) => setLinhaInicial(parseInt(e.target.value) || 2)}
+                placeholder="2"
+                style={{ 
+                  width: '100%', 
+                  padding: '0.5rem', 
+                  border: '1px solid #ddd', 
+                  borderRadius: '4px',
+                  fontSize: '0.9rem'
+                }}
+                disabled={importMutation.isPending}
+              />
+              <p style={{ marginTop: '0.25rem', fontSize: '0.85rem', color: '#7f8c8d' }}>
+                Linha 1 é o cabeçalho. Informe a partir de qual linha começar a importação (padrão: 2).
+              </p>
+            </div>
+
             <input
               ref={fileInputRef}
               type="file"
@@ -495,6 +521,7 @@ export default function LeadsList() {
                 onClick={() => {
                   setShowImportModal(false)
                   setImportResult(null)
+                  setLinhaInicial(2)
                   if (fileInputRef.current) {
                     fileInputRef.current.value = ''
                   }

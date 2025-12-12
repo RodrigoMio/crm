@@ -19,7 +19,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: any) {
     // Busca o usuário completo para garantir que está ativo
-    const user = await this.usersService.findOne(payload.sub);
+    // Converte sub (que pode ser string do JWT) para number
+    const userId = typeof payload.sub === 'string' ? parseInt(payload.sub, 10) : payload.sub;
+    const user = await this.usersService.findOne(userId);
 
     if (!user.ativo) {
       throw new Error('Usuário inativo');

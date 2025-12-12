@@ -3,7 +3,7 @@
 
 -- Tabela de usuários
 CREATE TABLE IF NOT EXISTS usuarios (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id SERIAL PRIMARY KEY,
     nome VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     senha VARCHAR(255) NOT NULL,
@@ -19,7 +19,7 @@ CREATE INDEX IF NOT EXISTS idx_usuarios_perfil ON usuarios(perfil);
 
 -- Tabela de leads
 CREATE TABLE IF NOT EXISTS leads (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT generate_uuid(),
     data_entrada DATE NOT NULL,
     nome_razao_social VARCHAR(255) NOT NULL,
     nome_fantasia_apelido VARCHAR(255),
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS leads (
         'AGENTE_VENDAS',
         'BASE_CANAL_DO_CAMPO'
     )),
-    vendedor_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
+    vendedor_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -60,11 +60,13 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- Triggers para atualizar updated_at automaticamente
+-- Nota: PostgreSQL 11+ usa EXECUTE FUNCTION, versões anteriores usam EXECUTE PROCEDURE
 CREATE TRIGGER update_usuarios_updated_at BEFORE UPDATE ON usuarios
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 CREATE TRIGGER update_leads_updated_at BEFORE UPDATE ON leads
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 -- Inserir usuário admin padrão (senha: admin123)
 -- IMPORTANTE: Altere a senha após o primeiro login!

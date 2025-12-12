@@ -104,8 +104,8 @@ export class Lead {
   origem_lead: OrigemLead;
 
   // Vendedor é obrigatório e referencia um usuário Agente
-  @Column({ type: 'uuid' })
-  vendedor_id: string;
+  @Column({ type: 'integer' })
+  vendedor_id: number;
 
   @ManyToOne(() => User, (user) => user.leads)
   @JoinColumn({ name: 'vendedor_id' })

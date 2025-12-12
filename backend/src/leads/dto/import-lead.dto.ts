@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsArray, IsUUID, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsArray, IsInt, IsDateString } from 'class-validator';
 import { LeadStatus, ItemInteresse, OrigemLead } from '../entities/lead.entity';
 
 /**
@@ -55,7 +55,7 @@ export class ImportLeadDto {
   origem_lead?: OrigemLead;
 
   @IsOptional()
-  @IsUUID()
-  vendedor_id?: string; // Vendedor (buscar por nome)
+  @IsInt()
+  vendedor_id?: number; // Vendedor ID (após buscar por nome)
 }
 

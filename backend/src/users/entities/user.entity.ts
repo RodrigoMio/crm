@@ -15,8 +15,8 @@ export enum UserProfile {
 
 @Entity('usuarios')
 export class User {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
   @Column({ type: 'varchar', length: 255 })
   nome: string;

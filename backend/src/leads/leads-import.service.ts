@@ -10,8 +10,9 @@ export class LeadsImportService {
   /**
    * Processa arquivo Excel (.xlsx, .xls)
    * Processa APENAS a primeira aba/guia da planilha
+   * @param linhaInicial Linha inicial para começar a importação (padrão: 2, pois linha 1 é cabeçalho)
    */
-  async processExcelFile(filePath: string): Promise<ImportLeadDto[]> {
+  async processExcelFile(filePath: string, linhaInicial: number = 2): Promise<ImportLeadDto[]> {
     try {
       const workbook = XLSX.readFile(filePath);
       
@@ -44,7 +45,18 @@ export class LeadsImportService {
         console.log(`⚠️ Arquivo contém ${workbook.SheetNames.length} abas. Processando apenas a primeira aba: "${sheetName}". As demais abas serão ignoradas.`);
       }
 
-      return this.mapExcelDataToLeads(data);
+      // Filtra dados a partir da linha inicial (linhaInicial - 2 porque array começa em 0 e linha 1 é cabeçalho)
+      // Exemplo: linhaInicial = 5 significa começar na linha 5 da planilha
+      // No array, isso seria índice 3 (linha 1 = índice 0, linha 2 = índice 1, ..., linha 5 = índice 4)
+      // Mas como linha 1 é cabeçalho, linha 5 = índice 3 (5 - 2 = 3)
+      const startIndex = Math.max(0, linhaInicial - 2);
+      const filteredData = data.slice(startIndex);
+
+      if (filteredData.length === 0) {
+        throw new BadRequestException(`Não há dados para importar a partir da linha ${linhaInicial}.`);
+      }
+
+      return this.mapExcelDataToLeads(filteredData, linhaInicial);
     } catch (error) {
       // Se o erro já contém informações sobre ID e linha, propaga como está
       if (error.message && (error.message.includes('ID:') || error.message.includes('Linha'))) {
@@ -62,8 +74,9 @@ export class LeadsImportService {
 
   /**
    * Processa arquivo CSV
+   * @param linhaInicial Linha inicial para começar a importação (padrão: 2, pois linha 1 é cabeçalho)
    */
-  async processCsvFile(filePath: string): Promise<ImportLeadDto[]> {
+  async processCsvFile(filePath: string, linhaInicial: number = 2): Promise<ImportLeadDto[]> {
     return new Promise((resolve, reject) => {
       const results: any[] = [];
 
@@ -72,7 +85,16 @@ export class LeadsImportService {
         .on('data', (data) => results.push(data))
         .on('end', () => {
           try {
-            const leads = this.mapCsvDataToLeads(results);
+            // Filtra dados a partir da linha inicial (linhaInicial - 2 porque array começa em 0 e linha 1 é cabeçalho)
+            const startIndex = Math.max(0, linhaInicial - 2);
+            const filteredData = results.slice(startIndex);
+            
+            if (filteredData.length === 0) {
+              reject(new BadRequestException(`Não há dados para importar a partir da linha ${linhaInicial}.`));
+              return;
+            }
+            
+            const leads = this.mapCsvDataToLeads(filteredData, linhaInicial);
             resolve(leads);
           } catch (error) {
             reject(new BadRequestException(`Erro ao processar arquivo CSV: ${error.message}`));
@@ -99,8 +121,9 @@ export class LeadsImportService {
    * - Situacao: status (adicionar ao array)
    * - Vendedor: vendedor_id (buscar por nome)
    * - Origem do Lead: origem_lead
+   * @param linhaInicial Linha inicial da planilha (padrão: 2)
    */
-  private mapExcelDataToLeads(data: any[]): ImportLeadDto[] {
+  private mapExcelDataToLeads(data: any[], linhaInicial: number = 2): ImportLeadDto[] {
     return data.map((row, index) => {
       // Obtém o ID da primeira coluna
       // A primeira coluna pode vir como 'ID', 'id', 'Id', ou como primeira chave do objeto
@@ -173,7 +196,9 @@ export class LeadsImportService {
           lead.data_entrada = this.parseDate(lead.data_entrada);
         } catch (error) {
           // Propaga erro com ID para facilitar identificação
-          throw new BadRequestException(`Linha ${index + 2} (ID: ${leadId}): ${error.message}`);
+          // Calcula o número da linha real na planilha: index + linhaInicial
+          const linhaReal = index + linhaInicial;
+          throw new BadRequestException(`Linha ${linhaReal} (ID: ${leadId}): ${error.message}`);
         }
       }
 
@@ -210,9 +235,10 @@ export class LeadsImportService {
 
   /**
    * Mapeia dados do CSV para DTOs de Lead
+   * @param linhaInicial Linha inicial da planilha (padrão: 2)
    */
-  private mapCsvDataToLeads(data: any[]): ImportLeadDto[] {
-    return this.mapExcelDataToLeads(data); // Mesma lógica
+  private mapCsvDataToLeads(data: any[], linhaInicial: number = 2): ImportLeadDto[] {
+    return this.mapExcelDataToLeads(data, linhaInicial); // Mesma lógica
   }
 
   /**

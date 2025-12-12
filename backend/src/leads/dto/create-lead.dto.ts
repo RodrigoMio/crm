@@ -4,7 +4,7 @@ import {
   IsOptional,
   IsEnum,
   IsArray,
-  IsUUID,
+  IsInt,
   IsDateString,
   MinLength,
   Length,
@@ -58,6 +58,6 @@ export class CreateLeadDto {
   @IsEnum(OrigemLead)
   origem_lead?: OrigemLead;
 
-  @IsUUID()
-  vendedor_id: string;
+  @IsInt()
+  vendedor_id: number;
 }

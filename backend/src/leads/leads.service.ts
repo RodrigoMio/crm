@@ -213,14 +213,16 @@ export class LeadsService {
    * - Agente só pode importar para si mesmo
    * - Se ID já existir ou não estiver preenchido, para a importação
    * - Apenas ID e LEAD são obrigatórios
+   * @param linhaInicial Linha inicial da planilha (padrão: 2, pois linha 1 é cabeçalho)
    */
-  async importLeads(leadsData: any[], currentUser: User): Promise<{ success: number; error: any; idsIgnorados: number }> {
+  async importLeads(leadsData: any[], currentUser: User, linhaInicial: number = 2): Promise<{ success: number; error: any; idsIgnorados: number }> {
     let success = 0;
     let idsIgnorados = 0;
 
     for (let i = 0; i < leadsData.length; i++) {
       const leadData = leadsData[i];
-      const linha = i + 2; // +2 porque linha 1 é cabeçalho e array começa em 0
+      // Calcula o número da linha real na planilha: index + linhaInicial
+      const linha = i + linhaInicial;
       
       // Validação: Se ID não estiver preenchido, para a importação
       if (!leadData.id || leadData.id.trim() === '') {

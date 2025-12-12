@@ -29,6 +29,13 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       logging: process.env.NODE_ENV === 'development',
       migrations: ['src/migrations/**/*.ts'],
       migrationsTableName: 'migrations',
+      // Configurações para banco na nuvem
+      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      connectTimeoutMS: 10000, // 10 segundos de timeout
+      extra: {
+        max: 10, // máximo de conexões no pool
+        connectionTimeoutMillis: 10000, // timeout de conexão
+      },
     };
   }
 }

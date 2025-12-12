@@ -63,7 +63,7 @@ export class UsersService {
   /**
    * Busca um usuário por ID
    */
-  async findOne(id: string): Promise<User> {
+  async findOne(id: number): Promise<User> {
     const user = await this.usersRepository.findOne({
       where: { id },
       select: ['id', 'nome', 'email', 'perfil', 'ativo', 'created_at', 'updated_at'],
@@ -89,7 +89,7 @@ export class UsersService {
    * Atualiza um usuário
    * Apenas Admin pode atualizar
    */
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+  async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
 
     // Se estiver atualizando email, verifica duplicidade
@@ -116,7 +116,7 @@ export class UsersService {
    * Desativa um usuário (soft delete)
    * Apenas Admin pode desativar
    */
-  async deactivate(id: string): Promise<void> {
+  async deactivate(id: number): Promise<void> {
     const user = await this.findOne(id);
     user.ativo = false;
     await this.usersRepository.save(user);

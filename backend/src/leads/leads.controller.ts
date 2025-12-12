@@ -116,20 +116,28 @@ export class LeadsController {
 
     const filePath = file.path;
     const fileExt = extname(file.originalname).toLowerCase();
+    
+    // Obtém linha inicial do body (padrão: 2, pois linha 1 é cabeçalho)
+    // Com multipart/form-data, os campos ficam em req.body
+    const linhaInicial = req.body?.linhaInicial ? parseInt(req.body.linhaInicial, 10) : 2;
+    
+    if (linhaInicial < 2) {
+      throw new BadRequestException('Linha inicial deve ser maior ou igual a 2 (linha 1 é o cabeçalho)');
+    }
 
     try {
       let leads: any[];
 
       // Processa o arquivo baseado na extensão
       if (fileExt === '.csv') {
-        leads = await this.leadsImportService.processCsvFile(filePath);
+        leads = await this.leadsImportService.processCsvFile(filePath, linhaInicial);
       } else {
-        leads = await this.leadsImportService.processExcelFile(filePath);
+        leads = await this.leadsImportService.processExcelFile(filePath, linhaInicial);
       }
 
       // Importa os leads (linha a linha, para no primeiro erro)
       try {
-        const result = await this.leadsService.importLeads(leads, req.user);
+        const result = await this.leadsService.importLeads(leads, req.user, linhaInicial);
 
         // Remove o arquivo temporário
         const fs = require('fs');

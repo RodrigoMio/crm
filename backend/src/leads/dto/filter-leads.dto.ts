@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsArray, IsUUID, IsInt, Min } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsArray, IsInt, Min } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { LeadStatus, OrigemLead } from '../entities/lead.entity';
 
@@ -28,8 +28,9 @@ export class FilterLeadsDto {
   uf?: string;
 
   @IsOptional()
-  @IsUUID()
-  vendedor_id?: string;
+  @Type(() => Number)
+  @IsInt()
+  vendedor_id?: number;
 
   @IsOptional()
   @Type(() => Number)
