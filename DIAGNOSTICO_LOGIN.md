@@ -77,3 +77,4 @@ Quando tentar fazer login, verifique o console do backend para ver se há erros.
 4. Inicie o frontend: `cd frontend && npm run dev`
 5. Tente fazer login novamente
 
+

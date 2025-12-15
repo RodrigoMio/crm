@@ -118,3 +118,4 @@ http://192.168.1.100:3000
 - Verifique se está escutando em `0.0.0.0` (não apenas localhost)
 - Verifique os logs do backend para erros
 
+

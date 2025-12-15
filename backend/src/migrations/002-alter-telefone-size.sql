@@ -4,3 +4,4 @@
 -- Altera o tamanho do campo telefone na tabela leads
 ALTER TABLE leads ALTER COLUMN telefone TYPE VARCHAR(255);
 
+
