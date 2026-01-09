@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserProfile } from './entities/user.entity';
@@ -15,9 +15,10 @@ export class UsersService {
 
   /**
    * Cria um novo usuário
-   * Apenas Admin pode criar usuários
+   * Admin pode criar AGENTE e COLABORADOR
+   * Agente pode criar COLABORADOR (vinculado a ele)
    */
-  async create(createUserDto: CreateUserDto): Promise<User> {
+  async create(createUserDto: CreateUserDto, currentUser?: User): Promise<User> {
     // Verifica se email já existe
     const existingUser = await this.usersRepository.findOne({
       where: { email: createUserDto.email },
@@ -25,6 +26,38 @@ export class UsersService {
 
     if (existingUser) {
       throw new ConflictException('Email já cadastrado');
+    }
+
+    // Validações específicas para COLABORADOR
+    if (createUserDto.perfil === UserProfile.COLABORADOR) {
+      if (!createUserDto.usuario_id_pai) {
+        throw new BadRequestException('Colaborador deve ter um Agente pai (usuario_id_pai)');
+      }
+
+      // Verifica se o pai existe e é um Agente
+      const pai = await this.usersRepository.findOne({
+        where: { id: createUserDto.usuario_id_pai },
+      });
+
+      if (!pai) {
+        throw new NotFoundException('Agente pai não encontrado');
+      }
+
+      if (pai.perfil !== UserProfile.AGENTE) {
+        throw new BadRequestException('Colaborador deve ser vinculado a um Agente');
+      }
+
+      // Se o usuário atual é Agente, só pode criar colaborador para si mesmo
+      if (currentUser && currentUser.perfil === UserProfile.AGENTE) {
+        if (createUserDto.usuario_id_pai !== currentUser.id) {
+          throw new ForbiddenException('Agente só pode criar colaboradores para si mesmo');
+        }
+      }
+    } else {
+      // Se não é COLABORADOR, não deve ter usuario_id_pai
+      if (createUserDto.usuario_id_pai) {
+        throw new BadRequestException('Apenas colaboradores podem ter usuario_id_pai');
+      }
     }
 
     // Hash da senha
@@ -51,11 +84,42 @@ export class UsersService {
 
   /**
    * Lista apenas usuários Agente (para seleção em leads)
+   * Filtra explicitamente por perfil = 'AGENTE' e ativo = true
    */
   async findAgentes(): Promise<User[]> {
     return await this.usersRepository.find({
-      where: { perfil: UserProfile.AGENTE, ativo: true },
-      select: ['id', 'nome', 'email'],
+      where: { 
+        perfil: UserProfile.AGENTE, 
+        ativo: true 
+      },
+      select: ['id', 'nome', 'email', 'perfil'],
+      order: { nome: 'ASC' },
+    });
+  }
+
+  /**
+   * Lista colaboradores de um Agente específico
+   * Se currentUser for Agente, retorna apenas seus colaboradores
+   * Se currentUser for Admin, pode filtrar por agente_id
+   */
+  async findColaboradores(agenteId?: number, currentUser?: User): Promise<User[]> {
+    const where: any = {
+      perfil: UserProfile.COLABORADOR,
+      ativo: true,
+    };
+
+    // Se o usuário atual é Agente, só pode ver seus próprios colaboradores
+    if (currentUser && currentUser.perfil === UserProfile.AGENTE) {
+      where.usuario_id_pai = currentUser.id;
+    } else if (agenteId) {
+      // Admin pode filtrar por agente_id
+      where.usuario_id_pai = agenteId;
+    }
+
+    return await this.usersRepository.find({
+      where,
+      select: ['id', 'nome', 'email', 'usuario_id_pai', 'ativo', 'created_at', 'updated_at'],
+      relations: ['usuario_pai'],
       order: { nome: 'ASC' },
     });
   }
@@ -67,6 +131,23 @@ export class UsersService {
     const user = await this.usersRepository.findOne({
       where: { id },
       select: ['id', 'nome', 'email', 'perfil', 'ativo', 'created_at', 'updated_at'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    return user;
+  }
+
+  /**
+   * Busca um usuário por ID com relações (usuario_pai)
+   */
+  async findOneWithRelations(id: number): Promise<User> {
+    const user = await this.usersRepository.findOne({
+      where: { id },
+      select: ['id', 'nome', 'email', 'perfil', 'ativo', 'usuario_id_pai', 'created_at', 'updated_at'],
+      relations: ['usuario_pai'],
     });
 
     if (!user) {

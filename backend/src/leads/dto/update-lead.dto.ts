@@ -6,6 +6,10 @@ export class UpdateLeadDto extends PartialType(CreateLeadDto) {
   @IsOptional()
   @IsInt()
   vendedor_id?: number;
+
+  @IsOptional()
+  @IsInt()
+  usuario_id_colaborador?: number;
 }
 
 

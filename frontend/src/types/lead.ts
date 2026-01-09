@@ -1,3 +1,5 @@
+import { Produto } from './produto'
+
 export enum LeadStatus {
   NAO_ATENDEU = 'NAO_ATENDEU',
   NAO_E_MOMENTO = 'NAO_E_MOMENTO',
@@ -37,17 +39,15 @@ export enum OrigemLead {
 }
 
 export interface Lead {
-  id: string
+  id: number
   data_entrada: string
   nome_razao_social: string
   nome_fantasia_apelido?: string
   telefone?: string
   email?: string
-  uf: string
-  municipio: string
+  uf?: string
+  municipio?: string
   anotacoes?: string
-  status?: LeadStatus[]
-  itens_interesse?: ItemInteresse[]
   origem_lead?: OrigemLead
   vendedor_id: string
   vendedor?: {
@@ -55,6 +55,21 @@ export interface Lead {
     nome: string
     email: string
   }
+  usuario_id_colaborador?: number
+  colaborador?: {
+    id: number
+    nome: string
+    email: string
+  }
+  kanban_status_id?: number
+  kanbanStatus?: {
+    kanban_status_id: number
+    descricao: string
+    bg_color: string
+    text_color: string
+  }
+  total_conversoes?: number
+  produtos?: Produto[]
   created_at: string
   updated_at: string
 }
@@ -65,20 +80,22 @@ export interface CreateLeadDto {
   nome_fantasia_apelido?: string
   telefone?: string
   email?: string
-  uf: string
-  municipio: string
+  uf?: string
+  municipio?: string
   anotacoes?: string
-  status?: LeadStatus[]
-  itens_interesse?: ItemInteresse[]
   origem_lead?: OrigemLead
-  vendedor_id: string
+  vendedor_id?: string
+  usuario_id_colaborador?: number
+  produtos?: number[]
 }
 
 export interface FilterLeadsDto {
   nome_razao_social?: string
-  status?: LeadStatus
   uf?: string
   vendedor_id?: string
+  usuario_id_colaborador?: number
+  origem_lead?: OrigemLead
+  produtos?: number[]
 }
 
 

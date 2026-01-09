@@ -3,6 +3,16 @@ import { DataSourceOptions } from 'typeorm';
 import { Injectable } from '@nestjs/common';
 import { User } from '../users/entities/user.entity';
 import { Lead } from '../leads/entities/lead.entity';
+import { Occurrence } from '../occurrences/entities/occurrence.entity';
+import { KanbanModelo } from '../kanban-modelos/entities/kanban-modelo.entity';
+import { KanbanStatus } from '../kanban-modelos/entities/kanban-status.entity';
+import { KanbanModeloStatus } from '../kanban-modelos/entities/kanban-modelo-status.entity';
+import { KanbanBoard } from '../kanban-boards/entities/kanban-board.entity';
+import { Appointment } from '../appointments/entities/appointment.entity';
+import { Produto } from '../produtos/entities/produto.entity';
+import { Ocorrencia } from '../ocorrencias/entities/ocorrencia.entity';
+import { LeadOcorrencia } from '../lead-ocorrencias/entities/lead-ocorrencia.entity';
+import { LeadsProduto } from '../leads-produtos/entities/leads-produto.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -24,8 +34,8 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       username: process.env.DB_USERNAME || 'postgres',
       password: process.env.DB_PASSWORD || 'postgres',
       database: process.env.DB_DATABASE || 'crm_lead',
-      entities: [User, Lead],
-      synchronize: process.env.NODE_ENV !== 'production', // false em produção
+      entities: [User, Lead, Occurrence, KanbanModelo, KanbanStatus, KanbanModeloStatus, KanbanBoard, Appointment, Produto, Ocorrencia, LeadOcorrencia, LeadsProduto],
+      synchronize: false, // Desabilitado - sequência deve ser criada manualmente
       logging: process.env.NODE_ENV === 'development',
       migrations: ['src/migrations/**/*.ts'],
       migrationsTableName: 'migrations',

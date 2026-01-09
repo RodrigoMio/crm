@@ -1,5 +1,5 @@
-import { IsString, IsOptional, IsEnum, IsArray, IsInt, IsDateString } from 'class-validator';
-import { LeadStatus, ItemInteresse, OrigemLead } from '../entities/lead.entity';
+import { IsString, IsOptional, IsEnum, IsInt, IsDateString, IsNumber } from 'class-validator';
+import { OrigemLead } from '../entities/lead.entity';
 
 /**
  * DTO para validação de dados importados da planilha
@@ -41,21 +41,23 @@ export class ImportLeadDto {
   anotacoes?: string; // Descrição do produto
 
   @IsOptional()
-  @IsArray()
-  @IsEnum(LeadStatus, { each: true })
-  status?: LeadStatus[]; // Situacao
-
-  @IsOptional()
-  @IsArray()
-  @IsEnum(ItemInteresse, { each: true })
-  itens_interesse?: ItemInteresse[]; // Raça
-
-  @IsOptional()
   @IsEnum(OrigemLead)
   origem_lead?: OrigemLead;
 
   @IsOptional()
   @IsInt()
   vendedor_id?: number; // Vendedor ID (após buscar por nome)
+
+  @IsOptional()
+  @IsString()
+  ocorrencia?: string; // Coluna OCORRENCIA da planilha
+
+  @IsOptional()
+  @IsString()
+  tags?: string; // Coluna TAGS da planilha
+
+  @IsOptional()
+  @IsNumber()
+  total_conversoes?: number; // Total Conversões
 }
 

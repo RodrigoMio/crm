@@ -12,6 +12,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -46,8 +47,33 @@ export class LeadsController {
    * Admin vê todos, Agente vê apenas os seus
    */
   @Get()
-  findAll(@Query() filterDto: FilterLeadsDto, @Request() req) {
+  findAll(@Query() query: any, @Request() req) {
+    // Transforma produtos de string/array para number[]
+    const filterDto: FilterLeadsDto = {
+      ...query,
+      produtos: query.produtos 
+        ? Array.isArray(query.produtos) 
+          ? query.produtos.map((p: string) => parseInt(p, 10))
+          : [parseInt(query.produtos, 10)]
+        : undefined,
+      vendedor_id: query.vendedor_id ? parseInt(query.vendedor_id, 10) : undefined,
+      usuario_id_colaborador: query.usuario_id_colaborador ? parseInt(query.usuario_id_colaborador, 10) : undefined,
+      origem_lead: query.origem_lead,
+      page: query.page ? parseInt(query.page, 10) : undefined,
+      limit: query.limit ? parseInt(query.limit, 10) : undefined,
+    };
     return this.leadsService.findAll(filterDto, req.user);
+  }
+
+  /**
+   * Retorna o maior ID cadastrado na tabela leads
+   * Útil para referência na importação de planilhas
+   * IMPORTANTE: Esta rota deve vir ANTES de @Get(':id') para evitar conflito
+   */
+  @Get('max-id')
+  async getMaxId() {
+    const maxId = await this.leadsService.getMaxId();
+    return { maxId: maxId || 0 };
   }
 
   /**
@@ -56,7 +82,7 @@ export class LeadsController {
    * Agente só pode ver os seus
    */
   @Get(':id')
-  findOne(@Param('id') id: string, @Request() req) {
+  findOne(@Param('id', ParseIntPipe) id: number, @Request() req) {
     return this.leadsService.findOne(id, req.user);
   }
 
@@ -66,7 +92,7 @@ export class LeadsController {
    * Agente só pode atualizar os seus
    */
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateLeadDto: UpdateLeadDto, @Request() req) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() updateLeadDto: UpdateLeadDto, @Request() req) {
     return this.leadsService.update(id, updateLeadDto, req.user);
   }
 
@@ -76,7 +102,7 @@ export class LeadsController {
    * Agente só pode remover os seus
    */
   @Delete(':id')
-  remove(@Param('id') id: string, @Request() req) {
+  remove(@Param('id', ParseIntPipe) id: number, @Request() req) {
     return this.leadsService.remove(id, req.user);
   }
 
@@ -117,38 +143,99 @@ export class LeadsController {
     const filePath = file.path;
     const fileExt = extname(file.originalname).toLowerCase();
     
-    // Obtém linha inicial do body (padrão: 2, pois linha 1 é cabeçalho)
+    // Obtém ID inicial e final do body (opcional)
     // Com multipart/form-data, os campos ficam em req.body
-    const linhaInicial = req.body?.linhaInicial ? parseInt(req.body.linhaInicial, 10) : 2;
+    const idInicial = req.body?.idInicial ? parseInt(req.body.idInicial, 10) : null;
+    const idFinal = req.body?.idFinal ? parseInt(req.body.idFinal, 10) : null;
     
-    if (linhaInicial < 2) {
-      throw new BadRequestException('Linha inicial deve ser maior ou igual a 2 (linha 1 é o cabeçalho)');
+    if (idInicial !== null && (isNaN(idInicial) || idInicial <= 0)) {
+      throw new BadRequestException('ID inicial deve ser um número positivo');
+    }
+
+    if (idFinal !== null && (isNaN(idFinal) || idFinal <= 0)) {
+      throw new BadRequestException('ID final deve ser um número positivo');
+    }
+
+    if (idInicial !== null && idFinal !== null && idFinal < idInicial) {
+      throw new BadRequestException('ID final deve ser maior ou igual ao ID inicial');
     }
 
     try {
       let leads: any[];
 
-      // Processa o arquivo baseado na extensão
+      // Processa o arquivo baseado na extensão (sem filtro de linha, processa tudo)
       if (fileExt === '.csv') {
-        leads = await this.leadsImportService.processCsvFile(filePath, linhaInicial);
+        leads = await this.leadsImportService.processCsvFile(filePath);
       } else {
-        leads = await this.leadsImportService.processExcelFile(filePath, linhaInicial);
+        leads = await this.leadsImportService.processExcelFile(filePath);
+      }
+
+      // Filtra por ID se especificado
+      if (idInicial !== null || idFinal !== null) {
+        leads = leads.filter(lead => {
+          if (!lead.id) return false;
+          const leadId = typeof lead.id === 'string' ? parseInt(lead.id.trim(), 10) : Number(lead.id);
+          if (isNaN(leadId)) return false;
+          
+          if (idInicial !== null && leadId < idInicial) return false;
+          if (idFinal !== null && leadId > idFinal) return false;
+          
+          return true;
+        });
+      }
+
+      // Valida se há leads para importar após o processamento
+      if (!leads || leads.length === 0) {
+        // Remove o arquivo temporário
+        const fs = require('fs');
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+        
+        throw new BadRequestException({
+          erro: 'Nenhum lead válido encontrado na planilha. Verifique se os campos obrigatórios (ID e LEAD) estão preenchidos.',
+          detalhes: 'Linhas com ID ou LEAD vazios são ignoradas automaticamente.',
+        });
       }
 
       // Importa os leads (linha a linha, para no primeiro erro)
       try {
-        const result = await this.leadsService.importLeads(leads, req.user, linhaInicial);
+        const result = await this.leadsService.importLeads(leads, req.user);
 
         // Remove o arquivo temporário
         const fs = require('fs');
-        fs.unlinkSync(filePath);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
 
-        // Retorna sucesso
-        return {
-          message: `${result.success} leads importados com sucesso.`,
+        // Retorna sucesso com mensagem mais informativa
+        let message = '';
+        if (result.success === 0 && result.idsIgnorados === 0) {
+          message = 'Nenhum lead foi importado. Verifique se os IDs já existem no banco ou se os campos obrigatórios estão preenchidos.';
+        } else if (result.success === 0 && result.idsIgnorados > 0) {
+          message = `Nenhum lead novo foi importado. ${result.idsIgnorados} ID(s) já existem no banco e foram ignorados.`;
+        } else {
+          message = `${result.success} lead(s) importado(s) com sucesso.`;
+          if (result.idsIgnorados > 0) {
+            message += ` ${result.idsIgnorados} ID(s) já existiam e foram ignorados.`;
+          }
+        }
+
+        // Log para debug
+        console.log('✅ Importação concluída:', {
+          success: result.success,
+          idsIgnorados: result.idsIgnorados,
+          message,
+        });
+
+        // Retorna resposta de forma explícita
+        const response = {
+          message,
           importedCount: result.success,
           idsIgnorados: result.idsIgnorados || 0,
         };
+
+        return response;
       } catch (importError) {
         // Remove o arquivo temporário em caso de erro
         const fs = require('fs');

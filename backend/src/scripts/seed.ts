@@ -6,7 +6,7 @@
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User, UserProfile } from '../users/entities/user.entity';
-import { Lead, LeadStatus, ItemInteresse, OrigemLead } from '../leads/entities/lead.entity';
+import { Lead, OrigemLead } from '../leads/entities/lead.entity';
 import { DatabaseConfig } from '../config/database.config';
 
 async function seed() {
@@ -62,8 +62,6 @@ async function seed() {
         uf: 'SP',
         municipio: 'Campinas',
         anotacoes: 'Cliente interessado em Nelore',
-        status: [LeadStatus.TEM_INTERESSE, LeadStatus.LEAD_QUENTE],
-        itens_interesse: [ItemInteresse.NELORE, ItemInteresse.NELORE_MOCHO],
         origem_lead: OrigemLead.CAMPANHA_MKT,
         vendedor_id: agente1.id,
       },
@@ -74,8 +72,6 @@ async function seed() {
         uf: 'RS',
         municipio: 'Porto Alegre',
         anotacoes: 'Aguardando retorno',
-        status: [LeadStatus.RETORNO_AGENDADO],
-        itens_interesse: [ItemInteresse.ANGUS, ItemInteresse.BRANGUS],
         origem_lead: OrigemLead.NETWORKING,
         vendedor_id: agente1.id,
       },
@@ -86,8 +82,6 @@ async function seed() {
         email: 'contato@fazendaverde.com',
         uf: 'MG',
         municipio: 'Uberlândia',
-        status: [LeadStatus.NAO_ATENDEU],
-        itens_interesse: [ItemInteresse.GUZERA],
         origem_lead: OrigemLead.WHATSAPP,
         vendedor_id: agente2.id,
       },

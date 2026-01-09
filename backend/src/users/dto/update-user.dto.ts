@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, IsEnum, IsOptional, IsBoolean } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsEnum, IsOptional, IsBoolean, IsInt, ValidateIf } from 'class-validator';
 import { UserProfile } from '../entities/user.entity';
 
 export class UpdateUserDto {
@@ -21,9 +21,16 @@ export class UpdateUserDto {
   perfil?: UserProfile;
 
   @IsOptional()
+  @IsInt({ message: 'usuario_id_pai deve ser um número inteiro' })
+  @ValidateIf((o) => o.perfil === UserProfile.COLABORADOR)
+  usuario_id_pai?: number;
+
+  @IsOptional()
   @IsBoolean()
   ativo?: boolean;
 }
+
+
 
 
 

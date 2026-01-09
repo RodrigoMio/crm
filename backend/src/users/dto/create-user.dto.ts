@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, IsEnum, IsOptional, IsBoolean } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsEnum, IsOptional, IsBoolean, IsInt, ValidateIf } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { UserProfile } from '../entities/user.entity';
 
@@ -14,8 +14,13 @@ export class CreateUserDto {
   @MinLength(6, { message: 'Senha deve ter pelo menos 6 caracteres' })
   senha: string;
 
-  @IsEnum(UserProfile, { message: 'Perfil deve ser ADMIN ou AGENTE' })
+  @IsEnum(UserProfile, { message: 'Perfil deve ser ADMIN, AGENTE ou COLABORADOR' })
   perfil: UserProfile;
+
+  @IsOptional()
+  @IsInt({ message: 'usuario_id_pai deve ser um número inteiro' })
+  @ValidateIf((o) => o.perfil === UserProfile.COLABORADOR)
+  usuario_id_pai?: number;
 
   @IsOptional()
   @Transform(({ value }) => {

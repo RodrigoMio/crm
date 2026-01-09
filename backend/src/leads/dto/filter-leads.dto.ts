@@ -1,27 +1,11 @@
-import { IsString, IsOptional, IsEnum, IsArray, IsInt, Min } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
-import { LeadStatus, OrigemLead } from '../entities/lead.entity';
+import { IsString, IsOptional, IsInt, Min, IsArray, IsEnum } from 'class-validator';
+import { Type } from 'class-transformer';
+import { OrigemLead } from '../entities/lead.entity';
 
 export class FilterLeadsDto {
   @IsOptional()
   @IsString()
   nome_razao_social?: string;
-
-  @IsOptional()
-  @Transform(({ value }) => {
-    // Se for string, converte para array
-    if (typeof value === 'string') {
-      return [value];
-    }
-    // Se já for array, retorna como está
-    if (Array.isArray(value)) {
-      return value;
-    }
-    return value;
-  })
-  @IsArray()
-  @IsEnum(LeadStatus, { each: true })
-  status?: LeadStatus[];
 
   @IsOptional()
   @IsString()
@@ -31,6 +15,21 @@ export class FilterLeadsDto {
   @Type(() => Number)
   @IsInt()
   vendedor_id?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  usuario_id_colaborador?: number;
+
+  @IsOptional()
+  @IsEnum(OrigemLead)
+  origem_lead?: OrigemLead;
+
+  @IsOptional()
+  @IsArray()
+  @Type(() => Number)
+  @IsInt({ each: true })
+  produtos?: number[];
 
   @IsOptional()
   @Type(() => Number)

@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../services/api'
-import { CreateLeadDto, LeadStatus, ItemInteresse, OrigemLead } from '../types/lead'
+import { CreateLeadDto, OrigemLead } from '../types/lead'
 import { useAuth } from '../contexts/AuthContext'
+import ProductTagsInput from '../components/ProductTagsInput'
 import './LeadForm.css'
 
 export default function LeadForm() {
@@ -17,21 +18,61 @@ export default function LeadForm() {
     nome_razao_social: '',
     uf: '',
     municipio: '',
-    vendedor_id: user?.id || '',
+    vendedor_id: user?.perfil === 'AGENTE' ? user.id : undefined,
+    produtos: [],
   })
 
   const [agentes, setAgentes] = useState<any[]>([])
+  const [colaboradores, setColaboradores] = useState<any[]>([])
+  const [agentePaiNome, setAgentePaiNome] = useState<string>('')
 
-  // Busca lista de agentes
+  // Busca dados completos do usuário logado (para Colaborador obter agente pai)
   useEffect(() => {
-    api.get('/users/agentes').then((res) => {
-      setAgentes(res.data)
-      // Se for Agente, já define ele mesmo como vendedor
-      if (user?.perfil === 'AGENTE' && !formData.vendedor_id) {
-        setFormData((prev) => ({ ...prev, vendedor_id: user.id }))
-      }
-    })
-  }, [user])
+    if (user?.perfil === 'COLABORADOR' && user.id && !isEdit) {
+      api.get('/users/me').then((res) => {
+        if (res.data.usuario_pai) {
+          setAgentePaiNome(res.data.usuario_pai.nome)
+          setFormData(prev => ({ ...prev, vendedor_id: String(res.data.usuario_pai.id) }))
+        }
+        setFormData(prev => ({ ...prev, usuario_id_colaborador: typeof user.id === 'string' ? parseInt(user.id, 10) : user.id }))
+      })
+    }
+  }, [user, isEdit])
+
+  // Busca lista de agentes (Admin)
+  useEffect(() => {
+    if (user?.perfil === 'ADMIN' && !isEdit) {
+      api.get('/users/agentes').then((res) => {
+        setAgentes(res.data)
+      })
+    }
+  }, [user, isEdit])
+
+  // Busca lista de colaboradores do agente logado (Agente)
+  useEffect(() => {
+    if (user?.perfil === 'AGENTE' && !isEdit) {
+      api.get('/users/colaboradores').then((res) => {
+        setColaboradores(res.data)
+      })
+      // Preenche vendedor_id com o agente logado
+      setFormData(prev => ({ ...prev, vendedor_id: user.id }))
+      // Busca agentes para obter o nome
+      api.get('/users/agentes').then((res) => {
+        setAgentes(res.data)
+      })
+    }
+  }, [user, isEdit])
+
+  // Carrega colaboradores quando vendedor é selecionado (Admin)
+  useEffect(() => {
+    if (user?.perfil === 'ADMIN' && formData.vendedor_id && !isEdit) {
+      api.get(`/users/colaboradores?agente_id=${formData.vendedor_id}`).then((res) => {
+        setColaboradores(res.data)
+      })
+    } else if (user?.perfil === 'ADMIN' && !formData.vendedor_id && !isEdit) {
+      setColaboradores([])
+    }
+  }, [formData.vendedor_id, user, isEdit])
 
   // Busca lead se estiver editando
   const { data: lead } = useQuery({
@@ -55,10 +96,9 @@ export default function LeadForm() {
         uf: lead.uf,
         municipio: lead.municipio,
         anotacoes: lead.anotacoes,
-        status: lead.status || [],
-        itens_interesse: lead.itens_interesse || [],
         origem_lead: lead.origem_lead,
         vendedor_id: lead.vendedor_id,
+        produtos: lead.produtos?.map((p: { produto_id: number }) => p.produto_id) || [],
       })
     }
   }, [lead])
@@ -82,28 +122,6 @@ export default function LeadForm() {
     mutation.mutate(formData)
   }
 
-  const handleStatusChange = (status: LeadStatus, checked: boolean) => {
-    setFormData((prev) => {
-      const current = prev.status || []
-      if (checked) {
-        return { ...prev, status: [...current, status] }
-      } else {
-        return { ...prev, status: current.filter((s) => s !== status) }
-      }
-    })
-  }
-
-  const handleItemInteresseChange = (item: ItemInteresse, checked: boolean) => {
-    setFormData((prev) => {
-      const current = prev.itens_interesse || []
-      if (checked) {
-        return { ...prev, itens_interesse: [...current, item] }
-      } else {
-        return { ...prev, itens_interesse: current.filter((i) => i !== item) }
-      }
-    })
-  }
-
   const formatLabel = (value: string) => {
     return value
       .split('_')
@@ -117,35 +135,7 @@ export default function LeadForm() {
 
       <form onSubmit={handleSubmit} className="form">
         <div className="form-row">
-          <div className="form-group">
-            <label>Data de Entrada *</label>
-            <input
-              type="date"
-              value={formData.data_entrada || new Date().toISOString().split('T')[0]}
-              onChange={(e) => setFormData({ ...formData, data_entrada: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Vendedor *</label>
-            <select
-              value={formData.vendedor_id}
-              onChange={(e) => setFormData({ ...formData, vendedor_id: e.target.value })}
-              required
-              disabled={user?.perfil === 'AGENTE'}
-            >
-              <option value="">Selecione...</option>
-              {agentes.map((agente) => (
-                <option key={agente.id} value={agente.id}>
-                  {agente.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="form-row">
+  
           <div className="form-group">
             <label>Nome/Razão Social *</label>
             <input
@@ -168,9 +158,125 @@ export default function LeadForm() {
               }
             />
           </div>
-        </div>
+          <div className="form-group">
+            <label>Data de Entrada *</label>
+            <input
+              type="date"
+              value={formData.data_entrada || new Date().toISOString().split('T')[0]}
+              onChange={(e) => setFormData({ ...formData, data_entrada: e.target.value })}
+              required
+            />
+          </div>
 
-        <div className="form-row">
+          {/* Campo Vendedor - apenas para criação (não exibir em edição) */}
+          {!isEdit && (
+            <>
+              {user?.perfil === 'ADMIN' && (
+                <div className="form-group">
+                  <label>Vendedor</label>
+                  <select
+                    value={formData.vendedor_id || ''}
+                    onChange={(e) => setFormData({ ...formData, vendedor_id: e.target.value ? e.target.value : undefined })}
+                  >
+                    <option value="">Selecione...</option>
+                    {agentes.map((agente) => (
+                      <option key={agente.id} value={agente.id}>
+                        {agente.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {user?.perfil === 'AGENTE' && (
+                <div className="form-group">
+                  <label>Vendedor</label>
+                  <input
+                    type="text"
+                    value={agentes.find(a => a.id === user.id)?.nome || user.nome || ''}
+                    readOnly
+                    style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                  />
+                </div>
+              )}
+
+              {user?.perfil === 'COLABORADOR' && (
+                <div className="form-group">
+                  <label>Vendedor</label>
+                  <input
+                    type="text"
+                    value={agentePaiNome || 'Carregando...'}
+                    readOnly
+                    style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Campo Colaborador - apenas para criação (não exibir em edição) */}
+          {!isEdit && (
+            <>
+              {user?.perfil === 'ADMIN' && (
+                <div className="form-group">
+                  <label>Colaborador</label>
+                  <select
+                    value={formData.usuario_id_colaborador?.toString() || ''}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      usuario_id_colaborador: e.target.value ? Number(e.target.value) : undefined 
+                    })}
+                    disabled={!formData.vendedor_id}
+                  >
+                    <option value="">Nenhum</option>
+                    {colaboradores.map((colaborador) => (
+                      <option key={colaborador.id} value={colaborador.id}>
+                        {colaborador.nome}
+                      </option>
+                    ))}
+                  </select>
+                  {!formData.vendedor_id && (
+                    <small style={{ display: 'block', marginTop: '0.25rem', color: '#666', fontSize: '0.85em' }}>
+                      Selecione um vendedor primeiro
+                    </small>
+                  )}
+                </div>
+              )}
+
+              {user?.perfil === 'AGENTE' && (
+                <div className="form-group">
+                  <label>Colaborador</label>
+                  <select
+                    value={formData.usuario_id_colaborador?.toString() || ''}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      usuario_id_colaborador: e.target.value ? Number(e.target.value) : undefined 
+                    })}
+                  >
+                    <option value="">Nenhum</option>
+                    {colaboradores.map((colaborador) => (
+                      <option key={colaborador.id} value={colaborador.id}>
+                        {colaborador.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {user?.perfil === 'COLABORADOR' && (
+                <div className="form-group">
+                  <label>Colaborador</label>
+                  <input
+                    type="text"
+                    value={user.nome || ''}
+                    readOnly
+                    style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                  />
+                </div>
+              )}
+            </>
+          )}
+
           <div className="form-group">
             <label>Telefone</label>
             <input
@@ -188,29 +294,23 @@ export default function LeadForm() {
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             />
           </div>
-        </div>
-
-        <div className="form-row">
           <div className="form-group">
-            <label>UF *</label>
+            <label>UF</label>
             <input
               type="text"
               maxLength={2}
-              value={formData.uf}
+              value={formData.uf || ''}
               onChange={(e) =>
                 setFormData({ ...formData, uf: e.target.value.toUpperCase() })
               }
-              required
             />
           </div>
-
           <div className="form-group">
-            <label>Município *</label>
+            <label>Município</label>
             <input
               type="text"
-              value={formData.municipio}
+              value={formData.municipio || ''}
               onChange={(e) => setFormData({ ...formData, municipio: e.target.value })}
-              required
             />
           </div>
         </div>
@@ -236,35 +336,12 @@ export default function LeadForm() {
         </div>
 
         <div className="form-group">
-          <label>Status (multiselect)</label>
-          <div className="checkbox-group">
-            {Object.values(LeadStatus).map((status) => (
-              <label key={status} className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={formData.status?.includes(status) || false}
-                  onChange={(e) => handleStatusChange(status, e.target.checked)}
-                />
-                {formatLabel(status)}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label>Itens de Interesse (multiselect)</label>
-          <div className="checkbox-group">
-            {Object.values(ItemInteresse).map((item) => (
-              <label key={item} className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={formData.itens_interesse?.includes(item) || false}
-                  onChange={(e) => handleItemInteresseChange(item, e.target.checked)}
-                />
-                {item}
-              </label>
-            ))}
-          </div>
+          <label>Produtos de interesse</label>
+          <ProductTagsInput
+            value={formData.produtos || []}
+            onChange={(produtos) => setFormData({ ...formData, produtos })}
+            isAdmin={user?.perfil === 'ADMIN'}
+          />
         </div>
 
         <div className="form-group">
@@ -272,7 +349,7 @@ export default function LeadForm() {
           <textarea
             value={formData.anotacoes || ''}
             onChange={(e) => setFormData({ ...formData, anotacoes: e.target.value })}
-            rows={5}
+            rows={3}
           />
         </div>
 
@@ -288,6 +365,8 @@ export default function LeadForm() {
     </div>
   )
 }
+
+
 
 
 

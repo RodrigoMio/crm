@@ -3,13 +3,13 @@ import {
   IsEmail,
   IsOptional,
   IsEnum,
-  IsArray,
   IsInt,
   IsDateString,
+  IsArray,
   MinLength,
   Length,
 } from 'class-validator';
-import { LeadStatus, ItemInteresse, OrigemLead } from '../entities/lead.entity';
+import { OrigemLead } from '../entities/lead.entity';
 
 export class CreateLeadDto {
   @IsOptional()
@@ -32,32 +32,33 @@ export class CreateLeadDto {
   @IsEmail()
   email?: string;
 
+  @IsOptional()
   @IsString()
-  @Length(2, 2)
-  uf: string;
+  @Length(2, 2, { message: 'UF deve ter exatamente 2 caracteres' })
+  uf?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(1)
-  municipio: string;
+  municipio?: string;
 
   @IsOptional()
   @IsString()
   anotacoes?: string;
 
   @IsOptional()
-  @IsArray()
-  @IsEnum(LeadStatus, { each: true })
-  status?: LeadStatus[];
-
-  @IsOptional()
-  @IsArray()
-  @IsEnum(ItemInteresse, { each: true })
-  itens_interesse?: ItemInteresse[];
-
-  @IsOptional()
   @IsEnum(OrigemLead)
   origem_lead?: OrigemLead;
 
+  @IsOptional()
   @IsInt()
-  vendedor_id: number;
+  vendedor_id?: number;
+
+  @IsOptional()
+  @IsInt()
+  usuario_id_colaborador?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  produtos?: number[];
 }

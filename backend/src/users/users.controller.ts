@@ -9,6 +9,8 @@ import {
   UseGuards,
   Request,
   ParseIntPipe,
+  Query,
+  ForbiddenException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -23,12 +25,24 @@ export class UsersController {
 
   /**
    * Cria um novo usuário
-   * Apenas Admin pode criar
+   * Admin pode criar AGENTE e COLABORADOR
+   * Agente pode criar COLABORADOR (vinculado a ele)
    */
   @Post()
-  @UseGuards(AdminGuard)
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  create(@Body() createUserDto: CreateUserDto, @Request() req) {
+    // Se for criar COLABORADOR, permite Agente também
+    if (createUserDto.perfil === 'COLABORADOR') {
+      // Agente pode criar colaborador, mas o usuario_id_pai será preenchido automaticamente
+      if (req.user.perfil === 'AGENTE') {
+        createUserDto.usuario_id_pai = req.user.id;
+      }
+    } else {
+      // Para outros perfis, apenas Admin
+      if (req.user.perfil !== 'ADMIN') {
+        throw new ForbiddenException('Apenas Admin pode criar usuários AGENTE');
+      }
+    }
+    return this.usersService.create(createUserDto, req.user);
   }
 
   /**
@@ -48,6 +62,26 @@ export class UsersController {
   @Get('agentes')
   findAgentes() {
     return this.usersService.findAgentes();
+  }
+
+  /**
+   * Lista colaboradores
+   * Agente vê apenas seus colaboradores
+   * Admin pode filtrar por agente_id
+   */
+  @Get('colaboradores')
+  findColaboradores(@Query('agente_id') agenteId?: string, @Request() req?) {
+    const agenteIdNumber = agenteId ? parseInt(agenteId, 10) : undefined;
+    return this.usersService.findColaboradores(agenteIdNumber, req.user);
+  }
+
+  /**
+   * Busca informações do usuário logado
+   * Qualquer usuário autenticado pode buscar suas próprias informações
+   */
+  @Get('me')
+  findMe(@Request() req) {
+    return this.usersService.findOneWithRelations(req.user.id);
   }
 
   /**

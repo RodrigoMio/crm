@@ -10,6 +10,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
+        timeout: 30000, // 30 segundos de timeout
         // Não remove o prefixo /api pois o backend agora usa esse prefixo
       },
     },

@@ -63,3 +63,10 @@ echo "5. Inicie o frontend: cd frontend && npm run dev"
 
 
 
+
+
+
+
+
+
+

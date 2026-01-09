@@ -115,9 +115,8 @@ Authorization: Bearer {token}
     "uf": "SP",
     "municipio": "Campinas",
     "anotacoes": "Cliente interessado em Nelore",
-    "status": ["TEM_INTERESSE", "LEAD_QUENTE"],
-    "itens_interesse": ["NELORE", "NELORE_MOCHO"],
     "origem_lead": "CAMPANHA_MKT",
+    "total_conversoes": 5,
     "vendedor_id": "uuid",
     "vendedor": {
       "id": "uuid",
@@ -153,9 +152,8 @@ Content-Type: application/json
   "uf": "SP",
   "municipio": "São Paulo",
   "anotacoes": "Cliente potencial",
-  "status": ["TEM_INTERESSE"],
-  "itens_interesse": ["NELORE", "ANGUS"],
   "origem_lead": "WHATSAPP",
+  "total_conversoes": 2,
   "vendedor_id": "uuid-do-vendedor"
 }
 ```
@@ -172,7 +170,6 @@ Authorization: Bearer {token}
 Content-Type: application/json
 
 {
-  "status": ["TEM_INTERESSE", "LEAD_QUENTE"],
   "anotacoes": "Atualização das anotações"
 }
 ```
@@ -206,21 +203,6 @@ Authorization: Bearer {token}
 - `NAO_E_PECUARISTA`
 - `AGUARDANDO_OFERTAS`
 
-### ItemInteresse
-- `GIR`
-- `GUZERA`
-- `INDUBRASIL`
-- `SINDI`
-- `NELORE`
-- `NELORE_MOCHO`
-- `TABAPUA`
-- `BRAHMAN`
-- `ANGUS`
-- `GIROLANDO`
-- `NELORE_PINTADO`
-- `HOLANDES`
-- `BRANGUS`
-
 ### OrigemLead
 - `CAMPANHA_MKT`
 - `HABILITADOS`
@@ -237,6 +219,13 @@ Authorization: Bearer {token}
 - `404 Not Found`: Recurso não encontrado
 - `409 Conflict`: Conflito (ex: email já cadastrado)
 - `400 Bad Request`: Dados inválidos
+
+
+
+
+
+
+
 
 
 

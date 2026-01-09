@@ -4,6 +4,12 @@ import Login from './pages/Login'
 import LeadsList from './pages/LeadsList'
 import LeadForm from './pages/LeadForm'
 import UsersList from './pages/UsersList'
+import ColaboradoresList from './pages/ColaboradoresList'
+import KanbanModelosList from './pages/KanbanModelosList'
+import KanbanAdmin from './pages/KanbanAdmin'
+import KanbanAgente from './pages/KanbanAgente'
+import KanbanColaborador from './pages/KanbanColaborador'
+import Agenda from './pages/Agenda'
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -54,6 +60,38 @@ function AppRoutes() {
             </AdminRoute>
           }
         />
+        <Route
+          path="kanban-modelos"
+          element={
+            <AdminRoute>
+              <KanbanModelosList />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="kanban-admin"
+          element={
+            <AdminRoute>
+              <KanbanAdmin />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="kanban-agente"
+          element={<KanbanAgente />}
+        />
+        <Route
+          path="kanban-colaborador"
+          element={<KanbanColaborador />}
+        />
+        <Route
+          path="colaboradores"
+          element={<ColaboradoresList />}
+        />
+        <Route
+          path="agenda"
+          element={<Agenda />}
+        />
       </Route>
     </Routes>
   )
@@ -68,6 +106,8 @@ function App() {
 }
 
 export default App
+
+
 
 
 

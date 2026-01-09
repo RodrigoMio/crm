@@ -169,8 +169,6 @@ CRM/
 - **uf**: UF (2 caracteres, obrigatório)
 - **municipio**: Município (obrigatório)
 - **anotacoes**: Texto livre
-- **status**: Multiselect (array)
-- **itens_interesse**: Multiselect (array)
 - **origem_lead**: Single select
 - **vendedor_id**: Referência ao usuário Agente (obrigatório)
 
@@ -211,17 +209,55 @@ npm test
 
 ## 🚀 Deploy
 
-### Backend
+### Publicação na KingHost
+
+Para publicar a aplicação completa na KingHost, consulte o guia detalhado:
+
+📖 **[GUIA_PUBLICACAO_KINGHOST.md](./GUIA_PUBLICACAO_KINGHOST.md)** - Guia completo passo a passo
+
+O guia inclui:
+- ✅ Preparação do backend e frontend
+- ✅ Configuração de variáveis de ambiente
+- ✅ Upload de arquivos
+- ✅ Configuração do banco de dados
+- ✅ Troubleshooting comum
+
+### Scripts de Deploy
+
+Scripts auxiliares estão disponíveis na pasta `scripts/`:
+
+**Backend:**
+```bash
+# Linux/Mac
+./scripts/deploy-backend.sh
+
+# Windows
+.\scripts\deploy-backend.ps1
+```
+
+**Frontend:**
+```bash
+# Linux/Mac
+./scripts/deploy-frontend.sh https://seu-backend.kinghost.net
+
+# Windows
+.\scripts\deploy-frontend.ps1 https://seu-backend.kinghost.net
+```
+
+### Deploy Manual
+
+#### Backend
 
 1. Configure as variáveis de ambiente em produção
 2. Execute as migrations
 3. Build: `npm run build`
 4. Execute: `npm run start:prod`
 
-### Frontend
+#### Frontend
 
 1. Build: `npm run build`
-2. Servir a pasta `dist` com um servidor web (nginx, etc)
+2. Servir a pasta `dist` com um servidor web (nginx, Apache, etc)
+3. Configure o servidor para servir `index.html` em todas as rotas (SPA)
 
 ## 📄 Licença
 

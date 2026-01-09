@@ -11,8 +11,13 @@ export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const performLogin = async () => {
+    // Validação básica
+    if (!email || !senha) {
+      setError('Por favor, preencha email e senha')
+      return
+    }
+
     setError('')
     setLoading(true)
 
@@ -24,6 +29,17 @@ export default function Login() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await performLogin()
+  }
+
+  const handleButtonClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    // Para mobile: garantir que o submit funcione mesmo se o evento submit não for disparado
+    e.preventDefault()
+    await performLogin()
   }
 
   return (
@@ -42,6 +58,7 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={loading}
+              autoComplete="email"
             />
           </div>
           <div className="form-group">
@@ -51,21 +68,37 @@ export default function Login() {
               id="senha"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  performLogin()
+                }
+              }}
               required
               disabled={loading}
+              autoComplete="current-password"
             />
           </div>
-          <button type="submit" disabled={loading} className="btn-primary">
+          <button 
+            type="button" 
+            disabled={loading} 
+            className="btn-primary"
+            onClick={handleButtonClick}
+          >
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
-        <p className="login-hint">
-          Usuário padrão: admin@crm.com / admin123
-        </p>
       </div>
     </div>
   )
 }
+
+
+
+
+
+
+
 
 
 

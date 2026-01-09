@@ -5,8 +5,10 @@ Este guia explica como fazer o deploy do backend na KingHost.
 ## 📋 Pré-requisitos
 
 1. Conta na KingHost com Node.js habilitado
-2. Banco de dados PostgreSQL configurado na KingHost
-3. Acesso SSH ou painel de controle da KingHost
+2. Banco de dados PostgreSQL configurado na **Redehost** (serviço separado)
+3. Credenciais de acesso ao banco de dados PostgreSQL na Redehost
+4. IP do servidor KingHost liberado no firewall da Redehost
+5. Acesso SSH ou painel de controle da KingHost
 
 ## 🚀 Passos para Deploy
 
@@ -25,7 +27,8 @@ npm run build
 Na KingHost, configure as seguintes variáveis de ambiente no painel de controle:
 
 ```env
-# Database Configuration
+# Database Configuration (Redehost)
+# ⚠️ O banco de dados está na Redehost, não na KingHost
 DB_HOST=pgsql01.redehost.com.br
 DB_PORT=5432
 DB_USERNAME=user_cc_crm
@@ -38,7 +41,9 @@ JWT_SECRET=seu_jwt_secret_super_seguro_aqui_mude_em_producao
 JWT_EXPIRES_IN=24h
 
 # Server Configuration
-PORT=3001
+PORT_SERVER=21008
+# Ou use PORT se a KingHost não usar PORT_SERVER
+PORT=21008
 NODE_ENV=production
 
 # Frontend URL (ajuste com a URL do seu frontend)
@@ -49,27 +54,28 @@ FRONTEND_URL=https://seu-dominio.com
 - Altere o `JWT_SECRET` para um valor seguro e único
 - Ajuste o `FRONTEND_URL` para a URL do seu frontend em produção
 - A porta será definida automaticamente pela KingHost (geralmente via variável `PORT`)
+- **Configure o firewall da Redehost** para permitir conexões do IP do servidor KingHost
 
 ### 3. Upload dos Arquivos
 
 Faça upload dos seguintes arquivos para o servidor da KingHost:
 
-**Arquivos necessários:**
-- `server.js` (arquivo de inicialização)
-- `package.json`
-- `dist/` (pasta com o código compilado - resultado do `npm run build`)
-- `.env` (opcional, se a KingHost não usar variáveis de ambiente no painel)
-
-**Estrutura de diretórios na KingHost:**
+**Estrutura na KingHost:**
 ```
-/
-├── server.js
+/apps_nodejs/crm/
+├── server.js          (arquivo de inicialização)
 ├── package.json
 ├── package-lock.json
-├── .env (opcional)
-└── dist/
+├── .env               (variáveis de ambiente)
+└── dist/              (pasta com o código compilado)
     └── main.js
 ```
+
+**Arquivos necessários:**
+- `server.js` (arquivo de inicialização) → `/apps_nodejs/crm/`
+- `package.json` → `/apps_nodejs/crm/`
+- `dist/` (pasta completa com o código compilado) → `/apps_nodejs/crm/dist/`
+- `.env` → `/apps_nodejs/crm/`
 
 ### 4. Instalar Dependências
 
@@ -81,15 +87,22 @@ npm install --production
 
 Isso instalará apenas as dependências de produção (sem devDependencies).
 
-### 5. Executar Migrations
+### 5. Executar Migrations (na Redehost)
 
-Antes de iniciar a aplicação, execute as migrations do banco de dados:
+⚠️ **IMPORTANTE:** Execute as migrations diretamente no banco de dados da **Redehost**.
 
+**Opção 1: Via painel da Redehost (phpPgAdmin ou similar)**
+- Acesse o painel de gerenciamento do PostgreSQL na **Redehost**
+- Execute o arquivo `backend/src/migrations/001-create-tables.sql`
+- Execute o arquivo `backend/src/migrations/002-alter-telefone-size.sql`
+
+**Opção 2: Via cliente PostgreSQL local**
 ```bash
-# Opção 1: Via SQL direto (recomendado)
-# Execute o arquivo backend/src/migrations/001-create-tables.sql no banco de dados
+psql -h pgsql01.redehost.com.br -U seu_usuario -d seu_banco -f backend/src/migrations/001-create-tables.sql
+```
 
-# Opção 2: Via script (se TypeORM estiver configurado)
+**Opção 3: Via script (se TypeORM estiver configurado e tiver acesso SSH)**
+```bash
 npm run migration:run
 ```
 
@@ -124,7 +137,7 @@ O arquivo `main.ts` já está configurado para aceitar requisições do frontend
 
 ### Porta
 
-A KingHost geralmente define a porta via variável de ambiente `PORT`. O código já está preparado para usar essa variável.
+A KingHost geralmente define a porta via variável de ambiente `PORT_SERVER` (padrão: 21008). O código está preparado para usar `PORT_SERVER` ou `PORT` como fallback.
 
 ### Uploads
 
@@ -136,7 +149,11 @@ A pasta `uploads/` será criada automaticamente. Certifique-se de que o servidor
 **Solução:** Execute `npm run build` antes de fazer o deploy.
 
 ### Erro de conexão com banco de dados
-**Solução:** Verifique se as variáveis de ambiente do banco estão corretas e se o banco está acessível.
+**Solução:** 
+1. Verifique se as variáveis de ambiente do banco estão corretas (certifique-se de que são da **Redehost**)
+2. **Verifique o firewall/IP whitelist na Redehost** - o IP do servidor KingHost precisa estar liberado
+3. Confirme que o host está correto (ex: `pgsql01.redehost.com.br`)
+4. Teste a conexão manualmente usando `psql` ou ferramenta similar
 
 ### Erro de porta
 **Solução:** Verifique se a variável `PORT` está configurada na KingHost ou se a porta padrão (3001) está disponível.

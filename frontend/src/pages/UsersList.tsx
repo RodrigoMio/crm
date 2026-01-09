@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'react-toastify'
 import { api } from '../services/api'
 import { User, UserProfile } from '../types/user'
+import { useAuth } from '../contexts/AuthContext'
 import './UsersList.css'
 
 export default function UsersList() {
   const queryClient = useQueryClient()
+  const { user: currentUser } = useAuth()
   const [showForm, setShowForm] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [formData, setFormData] = useState({
@@ -13,6 +16,7 @@ export default function UsersList() {
     email: '',
     senha: '',
     perfil: UserProfile.AGENTE,
+    usuario_id_pai: undefined as number | undefined,
     ativo: true,
   })
 
@@ -24,12 +28,23 @@ export default function UsersList() {
     },
   })
 
+  // Busca lista de agentes para seleção de usuario_id_pai
+  const { data: agentes = [] } = useQuery({
+    queryKey: ['agentes'],
+    queryFn: async () => {
+      const response = await api.get('/users/agentes')
+      return response.data
+    },
+    enabled: formData.perfil === UserProfile.COLABORADOR,
+  })
+
   const createMutation = useMutation({
     mutationFn: async (data: any) => api.post('/users', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       setShowForm(false)
       resetForm()
+      toast.success('Usuário criado com sucesso!')
     },
   })
 
@@ -40,10 +55,11 @@ export default function UsersList() {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       setEditingUser(null)
       resetForm()
+      toast.success('Usuário atualizado com sucesso!')
     },
     onError: (error: any) => {
+      // Erro já é tratado pelo interceptor do axios
       console.error('Erro ao atualizar usuário:', error)
-      alert(error.response?.data?.message || 'Erro ao atualizar usuário')
     },
   })
 
@@ -51,15 +67,18 @@ export default function UsersList() {
     mutationFn: async (id: string) => api.delete(`/users/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
+      toast.success('Usuário excluído com sucesso!')
     },
   })
 
   const resetForm = () => {
+    const defaultPerfil = currentUser?.perfil === 'AGENTE' ? UserProfile.COLABORADOR : UserProfile.AGENTE
     setFormData({
       nome: '',
       email: '',
       senha: '',
-      perfil: UserProfile.AGENTE,
+      perfil: defaultPerfil,
+      usuario_id_pai: currentUser?.perfil === 'AGENTE' ? Number(currentUser.id) : undefined,
       ativo: true,
     })
   }
@@ -71,6 +90,7 @@ export default function UsersList() {
       email: user.email,
       senha: '',
       perfil: user.perfil,
+      usuario_id_pai: user.usuario_id_pai,
       ativo: user.ativo,
     })
     setShowForm(true)
@@ -91,13 +111,19 @@ export default function UsersList() {
       updateMutation.mutate({ id: editingUser.id, data: updateData })
     } else {
       // Garante que todos os campos obrigatórios estão presentes
-      const createData = {
+      const createData: any = {
         nome: formData.nome.trim(),
         email: formData.email.trim(),
         senha: formData.senha,
         perfil: formData.perfil,
         ativo: Boolean(formData.ativo !== undefined ? formData.ativo : true),
       }
+      
+      // Se for COLABORADOR, inclui usuario_id_pai
+      if (formData.perfil === UserProfile.COLABORADOR && formData.usuario_id_pai) {
+        createData.usuario_id_pai = formData.usuario_id_pai
+      }
+      
       createMutation.mutate(createData)
     }
   }
@@ -158,14 +184,52 @@ export default function UsersList() {
                 <label>Perfil *</label>
                 <select
                   value={formData.perfil}
-                  onChange={(e) =>
-                    setFormData({ ...formData, perfil: e.target.value as UserProfile })
-                  }
+                  onChange={(e) => {
+                    const newPerfil = e.target.value as UserProfile
+                    setFormData({ 
+                      ...formData, 
+                      perfil: newPerfil,
+                      // Se mudar para COLABORADOR e for Agente, preenche automaticamente
+                      usuario_id_pai: newPerfil === UserProfile.COLABORADOR && currentUser?.perfil === 'AGENTE' 
+                        ? Number(currentUser.id) 
+                        : newPerfil === UserProfile.COLABORADOR 
+                        ? formData.usuario_id_pai 
+                        : undefined
+                    })
+                  }}
+                  disabled={currentUser?.perfil === 'AGENTE' && !editingUser}
                 >
-                  <option value={UserProfile.ADMIN}>Admin</option>
-                  <option value={UserProfile.AGENTE}>Agente</option>
+                  {currentUser?.perfil === 'ADMIN' && <option value={UserProfile.ADMIN}>Admin</option>}
+                  {currentUser?.perfil === 'ADMIN' && <option value={UserProfile.AGENTE}>Agente</option>}
+                  <option value={UserProfile.COLABORADOR}>Colaborador</option>
                 </select>
               </div>
+              
+              {formData.perfil === UserProfile.COLABORADOR && (
+                <div className="form-group">
+                  <label>Agente Pai *</label>
+                  <select
+                    value={formData.usuario_id_pai || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, usuario_id_pai: Number(e.target.value) })
+                    }
+                    required
+                    disabled={currentUser?.perfil === 'AGENTE' && !editingUser}
+                  >
+                    <option value="">Selecione um Agente</option>
+                    {agentes.map((agente: User) => (
+                      <option key={agente.id} value={agente.id}>
+                        {agente.nome}
+                      </option>
+                    ))}
+                  </select>
+                  {currentUser?.perfil === 'AGENTE' && !editingUser && (
+                    <small style={{ color: '#666', fontSize: '0.9em' }}>
+                      O colaborador será vinculado a você automaticamente
+                    </small>
+                  )}
+                </div>
+              )}
               <div className="form-group">
                 <label>
                   <input
@@ -216,7 +280,14 @@ export default function UsersList() {
                 <tr key={user.id}>
                   <td>{user.nome}</td>
                   <td>{user.email}</td>
-                  <td>{user.perfil}</td>
+                  <td>
+                    {user.perfil}
+                    {user.perfil === UserProfile.COLABORADOR && user.usuario_pai && (
+                      <small style={{ display: 'block', color: '#666', fontSize: '0.85em' }}>
+                        (Pai: {user.usuario_pai.nome})
+                      </small>
+                    )}
+                  </td>
                   <td>{user.ativo ? 'Ativo' : 'Inativo'}</td>
                   <td>
                     <button onClick={() => handleEdit(user)} className="btn-edit">

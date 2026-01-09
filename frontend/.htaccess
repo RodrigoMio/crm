@@ -1,0 +1,95 @@
+# Configuração Apache para SPA (Single Page Application)
+# Este arquivo deve ser colocado na raiz do diretório web junto com index.html
+
+# PROXY REVERSO PARA API - DEVE VIR ANTES DAS REGRAS DE SPA
+# Redireciona requisições /api para o backend Node.js na porta 21008
+<IfModule mod_proxy.c>
+  ProxyPass /api http://localhost:21008/api
+  ProxyPassReverse /api http://localhost:21008/api
+  ProxyPreserveHost On
+</IfModule>
+
+# Se mod_proxy não estiver disponível, use mod_rewrite como alternativa
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  
+  # Proxy reverso para API usando RewriteRule (se mod_proxy não funcionar)
+  # Descomente as linhas abaixo se mod_proxy não estiver disponível
+  # RewriteCond %{REQUEST_URI} ^/api
+  # RewriteRule ^api/(.*)$ http://localhost:21008/api/$1 [P,L]
+  
+  # Não reescrever arquivos existentes
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  
+  # Não reescrever requisições para /api (já tratadas pelo proxy acima)
+  RewriteCond %{REQUEST_URI} !^/api
+  
+  # Redirecionar todas as rotas para index.html (SPA)
+  RewriteRule . /index.html [L]
+</IfModule>
+
+# Configurações de cache para assets estáticos
+<IfModule mod_expires.c>
+  ExpiresActive On
+  
+  # Cache de imagens por 1 ano
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/gif "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+  ExpiresByType image/webp "access plus 1 year"
+  
+  # Cache de CSS e JS por 1 mês
+  ExpiresByType text/css "access plus 1 month"
+  ExpiresByType application/javascript "access plus 1 month"
+  ExpiresByType text/javascript "access plus 1 month"
+  
+  # Cache de fontes por 1 ano
+  ExpiresByType font/woff "access plus 1 year"
+  ExpiresByType font/woff2 "access plus 1 year"
+  ExpiresByType application/font-woff "access plus 1 year"
+  ExpiresByType application/font-woff2 "access plus 1 year"
+  
+  # HTML não deve ser cacheado
+  ExpiresByType text/html "access plus 0 seconds"
+</IfModule>
+
+# Compressão GZIP
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html
+  AddOutputFilterByType DEFLATE text/css
+  AddOutputFilterByType DEFLATE text/javascript
+  AddOutputFilterByType DEFLATE application/javascript
+  AddOutputFilterByType DEFLATE application/json
+  AddOutputFilterByType DEFLATE text/xml
+  AddOutputFilterByType DEFLATE application/xml
+  AddOutputFilterByType DEFLATE application/xml+rss
+</IfModule>
+
+# Segurança - Prevenir listagem de diretórios
+Options -Indexes
+
+# Headers de segurança
+<IfModule mod_headers.c>
+  # Prevenir clickjacking
+  Header always set X-Frame-Options "SAMEORIGIN"
+  
+  # Prevenir MIME type sniffing
+  Header always set X-Content-Type-Options "nosniff"
+  
+  # XSS Protection
+  Header always set X-XSS-Protection "1; mode=block"
+  
+  # Desabilitar cache para rotas da API
+  SetEnvIf Request_URI "^/api/" API_REQUEST
+  Header set Cache-Control "no-cache, no-store, must-revalidate" env=API_REQUEST
+  Header set Pragma "no-cache" env=API_REQUEST
+  Header set Expires "0" env=API_REQUEST
+</IfModule>
+
+
+
+
+

@@ -1,0 +1,89 @@
+.month-view {
+  width: 100%;
+}
+
+.month-view-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background-color: #e0e0e0;
+  border: 1px solid #e0e0e0;
+}
+
+.month-view-day-header {
+  padding: 0.75rem;
+  text-align: center;
+  font-weight: 600;
+  background-color: #f5f5f5;
+  color: #333;
+  font-size: 14px;
+}
+
+.month-view-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background-color: #e0e0e0;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+}
+
+.month-view-day {
+  background-color: white;
+  padding: 0.5rem;
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.month-view-day.empty {
+  background-color: #f9f9f9;
+}
+
+.month-view-day.today {
+  background-color: #e3f2fd;
+}
+
+.month-view-day.past {
+  background-color: #f5f5f5;
+  opacity: 0.7;
+}
+
+.month-view-day.drag-over {
+  background-color: #c8e6c9;
+  border: 2px dashed #4caf50;
+}
+
+.month-view-day-number {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #333;
+  font-size: 14px;
+}
+
+.month-view-day.today .month-view-day-number {
+  color: #1976d2;
+  font-weight: 700;
+}
+
+.month-view-day.past .month-view-day-number {
+  color: #999;
+}
+
+.month-view-day-appointments {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .month-view-day {
+    padding: 0.25rem;
+  }
+
+  .month-view-day-number {
+    font-size: 12px;
+  }
+}
+

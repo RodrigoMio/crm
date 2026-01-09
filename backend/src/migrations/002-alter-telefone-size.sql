@@ -5,3 +5,10 @@
 ALTER TABLE leads ALTER COLUMN telefone TYPE VARCHAR(255);
 
 
+
+
+
+
+
+
+

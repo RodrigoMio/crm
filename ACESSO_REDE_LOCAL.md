@@ -119,3 +119,10 @@ http://192.168.1.100:3000
 - Verifique os logs do backend para erros
 
 
+
+
+
+
+
+
+

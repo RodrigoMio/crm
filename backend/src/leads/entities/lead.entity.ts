@@ -9,6 +9,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { KanbanStatus } from '../../kanban-modelos/entities/kanban-status.entity';
 
 export enum LeadStatus {
   NAO_ATENDEU = 'NAO_ATENDEU',
@@ -50,8 +51,8 @@ export enum OrigemLead {
 
 @Entity('leads')
 export class Lead {
-  @PrimaryColumn({ type: 'varchar', length: 255 })
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
   @Column({ type: 'date' })
   data_entrada: Date;
@@ -77,24 +78,6 @@ export class Lead {
   @Column({ type: 'text', nullable: true })
   anotacoes: string;
 
-  // Status é um array (multiselect)
-  // Usa array nativo do PostgreSQL para melhor performance e compatibilidade
-  @Column({
-    type: 'text',
-    array: true,
-    nullable: true,
-  })
-  status: LeadStatus[];
-
-  // Itens de interesse é um array (multiselect)
-  // Usa array nativo do PostgreSQL para melhor performance e compatibilidade
-  @Column({
-    type: 'text',
-    array: true,
-    nullable: true,
-  })
-  itens_interesse: ItemInteresse[];
-
   // Origem é único (single select)
   @Column({
     type: 'enum',
@@ -103,13 +86,33 @@ export class Lead {
   })
   origem_lead: OrigemLead;
 
-  // Vendedor é obrigatório e referencia um usuário Agente
-  @Column({ type: 'integer' })
+  // Vendedor referencia um usuário Agente (pode ser NULL para board "Novos")
+  @Column({ type: 'integer', nullable: true })
   vendedor_id: number;
 
-  @ManyToOne(() => User, (user) => user.leads)
+  @ManyToOne(() => User, (user) => user.leads, { nullable: true })
   @JoinColumn({ name: 'vendedor_id' })
   vendedor: User;
+
+  // Colaborador opcional: referencia um usuário Colaborador
+  @Column({ type: 'integer', nullable: true })
+  usuario_id_colaborador: number;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'usuario_id_colaborador' })
+  colaborador: User;
+
+  // Status do kanban (módulo 3)
+  @Column({ type: 'integer', nullable: true, name: 'kanban_status_id' })
+  kanban_status_id: number;
+
+  @ManyToOne(() => KanbanStatus, { nullable: true })
+  @JoinColumn({ name: 'kanban_status_id' })
+  kanbanStatus: KanbanStatus;
+
+  // Total de conversões
+  @Column({ type: 'integer', nullable: true, name: 'total_conversoes' })
+  total_conversoes: number;
 
   @CreateDateColumn()
   created_at: Date;

@@ -1,6 +1,7 @@
 export enum UserProfile {
   ADMIN = 'ADMIN',
   AGENTE = 'AGENTE',
+  COLABORADOR = 'COLABORADOR',
 }
 
 export interface User {
@@ -9,6 +10,12 @@ export interface User {
   email: string
   perfil: UserProfile
   ativo: boolean
+  usuario_id_pai?: number
+  usuario_pai?: {
+    id: number
+    nome: string
+    email: string
+  }
   created_at: string
   updated_at: string
 }
@@ -18,6 +25,7 @@ export interface CreateUserDto {
   email: string
   senha: string
   perfil: UserProfile
+  usuario_id_pai?: number
   ativo?: boolean
 }
 
@@ -26,8 +34,11 @@ export interface UpdateUserDto {
   email?: string
   senha?: string
   perfil?: UserProfile
+  usuario_id_pai?: number
   ativo?: boolean
 }
+
+
 
 
 

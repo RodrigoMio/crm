@@ -5,7 +5,7 @@ interface User {
   id: string
   nome: string
   email: string
-  perfil: 'ADMIN' | 'AGENTE'
+  perfil: 'ADMIN' | 'AGENTE' | 'COLABORADOR'
 }
 
 interface AuthContextType {
@@ -71,6 +71,8 @@ export function useAuth() {
   }
   return context
 }
+
+
 
 
 
