@@ -63,6 +63,7 @@
 .form-group {
   display: flex;
   flex-direction: column;
+  padding: 0.5rem;
 }
 
 .form-group label {
@@ -71,10 +72,15 @@
   font-weight: 500;
 }
 
-.form-group input,
+.form-group input:not([type="checkbox"]),
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group input[type="tel"],
+.form-group input[type="date"],
 .form-group select,
 .form-group textarea {
-  padding: 0.75rem;
+  padding: 0.5rem !important;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 1rem;
@@ -82,14 +88,31 @@
   transition: border-color 0.2s;
 }
 
-.form-group input:focus,
+.form-group input[type="checkbox"] {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  margin-right: 8px !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  appearance: checkbox !important;
+  -webkit-appearance: checkbox !important;
+  -moz-appearance: checkbox !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+.form-group input:not([type="checkbox"]):focus,
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
   border-color: #3498db;
 }
 
-.form-group input:disabled,
+.form-group input:not([type="checkbox"]):disabled,
 .form-group select:disabled {
   background-color: #f5f5f5;
   cursor: not-allowed;
@@ -114,8 +137,19 @@
 }
 
 .checkbox-label input[type="checkbox"] {
-  width: auto;
-  cursor: pointer;
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  margin-right: 8px !important;
+  cursor: pointer !important;
+  appearance: checkbox !important;
+  -webkit-appearance: checkbox !important;
+  -moz-appearance: checkbox !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
 }
 
 .form-actions {

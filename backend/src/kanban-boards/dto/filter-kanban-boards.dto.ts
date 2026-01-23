@@ -25,8 +25,8 @@ export class FilterKanbanBoardsDto {
   @IsOptional()
   @IsString()
   nome?: string;
+
+  @IsOptional()
+  @IsString()
+  tipo_fluxo?: 'COMPRADOR' | 'VENDEDOR';
 }
-
-
-
-

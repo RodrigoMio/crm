@@ -3,6 +3,26 @@ import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import * as net from 'net';
+
+// Função auxiliar para verificar se a porta está disponível
+function isPortAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        resolve(false);
+      } else {
+        resolve(true);
+      }
+    });
+    server.once('listening', () => {
+      server.once('close', () => resolve(true));
+      server.close();
+    });
+    server.listen(port);
+  });
+}
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -170,14 +190,38 @@ async function bootstrap() {
   }
   
   // Usa PORT_SERVER (KingHost) ou PORT (padrão) ou 3001 como fallback
-  const port = process.env.PORT_SERVER || process.env.PORT || 3001;
+  const port = parseInt(process.env.PORT_SERVER || process.env.PORT || '3001', 10);
   const host = process.env.HOST || '0.0.0.0'; // 0.0.0.0 permite acesso de qualquer IP na rede
-  await app.listen(port, host);
-  console.log(`🚀 Backend rodando na porta ${port}`);
-  console.log(`📡 API disponível em http://localhost:${port}/api`);
-  console.log(`🌐 Acessível na rede em http://[SEU_IP]:${port}/api`);
-  if (frontendPath) {
-    console.log(`🌐 Frontend disponível em http://localhost:${port}/`);
+  
+  // Verifica se a porta está disponível antes de tentar iniciar
+  const portAvailable = await isPortAvailable(port);
+  if (!portAvailable) {
+    console.error(`\n❌ ERRO: A porta ${port} já está em uso!`);
+    console.error(`\n💡 Soluções:`);
+    console.error(`   1. Execute: npm run kill-port (no diretório backend)`);
+    console.error(`   2. Ou encerre manualmente o processo:`);
+    console.error(`      Windows: netstat -ano | findstr :${port}`);
+    console.error(`      Depois: taskkill /PID <PID> /F`);
+    console.error(`   3. Ou use outra porta definindo PORT=3002 no .env\n`);
+    process.exit(1);
+  }
+  
+  try {
+    await app.listen(port, host);
+    console.log(`🚀 Backend rodando na porta ${port}`);
+    console.log(`📡 API disponível em http://localhost:${port}/api`);
+    console.log(`🌐 Acessível na rede em http://[SEU_IP]:${port}/api`);
+    if (frontendPath) {
+      console.log(`🌐 Frontend disponível em http://localhost:${port}/`);
+    }
+  } catch (error: any) {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`\n❌ ERRO: A porta ${port} já está em uso!`);
+      console.error(`\n💡 Execute: npm run kill-port (no diretório backend)\n`);
+      process.exit(1);
+    } else {
+      throw error;
+    }
   }
 }
 

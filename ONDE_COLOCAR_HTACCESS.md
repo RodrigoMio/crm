@@ -227,3 +227,6 @@ Se você já fez upload do frontend, o `.htaccess` deve estar **no mesmo diretó
 **Pronto!** 🎉 O arquivo `.htaccess` deve estar na raiz do diretório web, junto com o `index.html`.
 
 
+
+
+

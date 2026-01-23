@@ -72,9 +72,18 @@ api.interceptors.response.use(
     }
 
     // Exibe mensagem de erro amigável
-    const errorMessage = error.response?.data?.message || 
-                         error.message || 
-                         'Ocorreu um erro inesperado. Por favor, tente novamente.'
+    let errorMessage = 'Ocorreu um erro inesperado. Por favor, tente novamente.'
+    
+    if (error.response?.data?.message) {
+      // Se a mensagem é um array, junta todas as mensagens
+      if (Array.isArray(error.response.data.message)) {
+        errorMessage = error.response.data.message.join(', ')
+      } else {
+        errorMessage = error.response.data.message
+      }
+    } else if (error.message) {
+      errorMessage = error.message
+    }
     
     // Não exibe toast para erros 401 (já redireciona para login)
     if (error.response?.status !== 401) {

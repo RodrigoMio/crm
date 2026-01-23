@@ -69,6 +69,7 @@ export interface Lead {
     text_color: string
   }
   total_conversoes?: number
+  tipo_lead?: string[]
   produtos?: Produto[]
   created_at: string
   updated_at: string
@@ -86,16 +87,20 @@ export interface CreateLeadDto {
   origem_lead?: OrigemLead
   vendedor_id?: string
   usuario_id_colaborador?: number
+  tipo_lead?: string[]
   produtos?: number[]
 }
 
 export interface FilterLeadsDto {
   nome_razao_social?: string
+  email?: string
+  telefone?: string
   uf?: string
   vendedor_id?: string
   usuario_id_colaborador?: number
   origem_lead?: OrigemLead
   produtos?: number[]
+  tipo_lead?: string
 }
 
 

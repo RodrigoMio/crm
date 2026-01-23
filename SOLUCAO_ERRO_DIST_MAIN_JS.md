@@ -218,3 +218,6 @@ chown crmcc:crmcc dist/main.js
 **Pronto!** 🎉 Se ainda tiver problemas, verifique os logs com `pm2 logs crm` e compartilhe a mensagem de erro completa.
 
 
+
+
+

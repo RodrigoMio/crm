@@ -275,3 +275,6 @@ Se você não tem acesso root/sudo na KingHost, entre em contato com o suporte e
 **Pronto!** 🎉 Após configurar o proxy reverso, o frontend conseguirá se conectar ao backend.
 
 
+
+
+

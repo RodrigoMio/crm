@@ -67,7 +67,23 @@ export default function UsersList() {
     mutationFn: async (id: string) => api.delete(`/users/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      toast.success('Usuário excluído com sucesso!')
+      toast.success('Usuário desativado com sucesso!')
+    },
+    onError: (error: any) => {
+      console.error('Erro ao desativar usuário:', error)
+      toast.error(error?.response?.data?.message || 'Erro ao desativar usuário. Tente novamente.')
+    },
+  })
+
+  const activateMutation = useMutation({
+    mutationFn: async (id: string) => api.patch(`/users/${id}`, { ativo: true }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      toast.success('Usuário reativado com sucesso!')
+    },
+    onError: (error: any) => {
+      console.error('Erro ao reativar usuário:', error)
+      toast.error(error?.response?.data?.message || 'Erro ao reativar usuário. Tente novamente.')
     },
   })
 
@@ -131,6 +147,12 @@ export default function UsersList() {
   const handleDelete = (id: string) => {
     if (confirm('Tem certeza que deseja desativar este usuário?')) {
       deleteMutation.mutate(id)
+    }
+  }
+
+  const handleActivate = (id: string) => {
+    if (confirm('Tem certeza que deseja reativar este usuário?')) {
+      activateMutation.mutate(id)
     }
   }
 
@@ -293,9 +315,15 @@ export default function UsersList() {
                     <button onClick={() => handleEdit(user)} className="btn-edit">
                       Editar
                     </button>
-                    <button onClick={() => handleDelete(user.id)} className="btn-delete">
-                      Desativar
-                    </button>
+                    {user.ativo ? (
+                      <button onClick={() => handleDelete(user.id)} className="btn-delete">
+                        Desativar
+                      </button>
+                    ) : (
+                      <button onClick={() => handleActivate(user.id)} className="btn-primary">
+                        Reativar
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

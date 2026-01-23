@@ -48,3 +48,6 @@ FOR EACH ROW
 EXECUTE FUNCTION update_appointments_updated_at();
 
 
+
+
+

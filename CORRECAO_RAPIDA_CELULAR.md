@@ -94,3 +94,6 @@ Para mais detalhes, consulte: **`SOLUCAO_PROBLEMA_CELULAR.md`**
 
 
 
+
+
+

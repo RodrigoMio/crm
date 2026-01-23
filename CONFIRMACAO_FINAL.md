@@ -113,3 +113,6 @@ Para a ocorrência: `"2025-07-24#COMPRA:GIR LEITEIRO,Fêmea(s)"`
 6. Testar com planilhas de exemplo
 7. Atualizar documentação
 
+
+
+

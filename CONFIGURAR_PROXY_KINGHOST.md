@@ -255,3 +255,6 @@ grep -r "AllowOverride" /etc/httpd/conf.d/
 **Pronto!** 🎉 Após configurar o proxy reverso, o frontend conseguirá se conectar ao backend.
 
 
+
+
+

@@ -107,6 +107,18 @@ export class LeadsController {
   }
 
   /**
+   * Verifica se o lead tem registro em lead_kanban_status para um tipo_fluxo específico
+   */
+  @Get(':id/kanban-status/:tipoFluxo')
+  checkKanbanStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('tipoFluxo') tipoFluxo: string,
+    @Request() req,
+  ) {
+    return this.leadsService.checkKanbanStatus(id, tipoFluxo, req.user);
+  }
+
+  /**
    * Importa leads de uma planilha (Excel ou CSV)
    * Admin pode importar para qualquer vendedor
    * Agente só pode importar para si mesmo

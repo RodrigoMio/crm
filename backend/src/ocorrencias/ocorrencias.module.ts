@@ -12,3 +12,6 @@ import { Ocorrencia } from './entities/ocorrencia.entity';
 })
 export class OcorrenciasModule {}
 
+
+
+

@@ -172,3 +172,6 @@ Todos os comandos usam `IF NOT EXISTS` ou verificações, então são seguros pa
 
 
 
+
+
+

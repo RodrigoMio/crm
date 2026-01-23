@@ -24,13 +24,16 @@ export class KanbanModelosController {
 
   /**
    * Lista todos os modelos de kanban com seus status
-   * Apenas ADMIN pode acessar
+   * ADMIN e AGENTE podem listar (para uso na criação de boards)
    */
   @Get()
   findAll(@Request() req) {
-    // Verifica se é ADMIN
-    if (req.user?.perfil !== UserProfile.ADMIN) {
-      throw new ForbiddenException('Apenas administradores podem acessar modelos de kanban');
+    // ADMIN e AGENTE podem listar modelos
+    if (
+      req.user?.perfil !== UserProfile.ADMIN &&
+      req.user?.perfil !== UserProfile.AGENTE
+    ) {
+      throw new ForbiddenException('Apenas administradores e agentes podem acessar modelos de kanban');
     }
     return this.kanbanModelosService.findAll();
   }

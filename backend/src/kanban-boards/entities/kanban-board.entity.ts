@@ -87,5 +87,12 @@ export class KanbanBoard {
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updated_at: Date;
-}
 
+  @Column({
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+    name: 'tipo_fluxo',
+  })
+  tipo_fluxo: 'COMPRADOR' | 'VENDEDOR' | null;
+}

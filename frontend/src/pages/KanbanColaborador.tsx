@@ -9,10 +9,17 @@ import OccurrencesModal from '../components/OccurrencesModal'
 import EditLeadModal from '../components/EditLeadModal'
 import ScheduleContactModal from '../components/ScheduleContactModal'
 import AppointmentBadge from '../components/AppointmentBadge'
+import FiltersModal from '../components/FiltersModal'
+import CreateLeadInBoardModal from '../components/CreateLeadInBoardModal'
 import { FilterLeadsDto } from '../types/lead'
 import './KanbanColaborador.css'
 
 const STORAGE_KEY_FILTERS = 'kanban-colaborador-filters'
+const STORAGE_KEY_SEARCH_TYPE = 'kanban-colaborador-search-type'
+const STORAGE_KEY_TIPO_FLUXO = 'kanban-colaborador-tipo-fluxo'
+const STORAGE_KEY_MINIMIZED_BOARDS = 'kanban-colaborador-minimized-boards'
+
+type SearchType = 'nome' | 'email' | 'telefone'
 
 // Tipo estendido para incluir campos específicos da tela
 interface ExtendedFilters extends FilterLeadsDto {
@@ -30,6 +37,31 @@ export default function KanbanColaborador() {
   const [selectedLeadForSchedule, setSelectedLeadForSchedule] = useState<Lead | null>(null)
   const [openMenuLeadId, setOpenMenuLeadId] = useState<number | null>(null)
   const [currentPage, setCurrentPage] = useState<number>(1)
+  const [showFiltersModal, setShowFiltersModal] = useState(false)
+  const [availableTypes, setAvailableTypes] = useState<('COMPRADOR' | 'VENDEDOR')[]>([])
+  const [selectedBoardForNewLead, setSelectedBoardForNewLead] = useState<number | null>(null)
+  
+  // Estado para controlar boards minimizados (chave: board.id, valor: true se minimizado)
+  const [minimizedBoards, setMinimizedBoards] = useState<Record<number, boolean>>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_MINIMIZED_BOARDS)
+    if (saved) {
+      try {
+        return JSON.parse(saved) as Record<number, boolean>
+      } catch {
+        return {}
+      }
+    }
+    return {}
+  })
+  
+  // Carrega tipo de busca do localStorage (padrão: 'nome')
+  const [searchType, setSearchType] = useState<SearchType>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_SEARCH_TYPE)
+    return (saved as SearchType) || 'nome'
+  })
+
+  // Estado para controlar abertura do dropdown
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   // Carrega filtros do localStorage na inicialização
   const [filters, setFilters] = useState<ExtendedFilters>(() => {
@@ -49,10 +81,174 @@ export default function KanbanColaborador() {
     localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(filters))
   }, [filters])
 
+  // Carrega tipo de fluxo do localStorage
+  const [tipoFluxo, setTipoFluxo] = useState<'COMPRADOR' | 'VENDEDOR' | null>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_TIPO_FLUXO)
+    return (saved === 'COMPRADOR' || saved === 'VENDEDOR') ? saved : null
+  })
+
+  // Salva tipo de busca no localStorage quando mudar
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_SEARCH_TYPE, searchType)
+  }, [searchType])
+
+  // Salva tipo de fluxo no localStorage quando mudar
+  useEffect(() => {
+    if (tipoFluxo) {
+      localStorage.setItem(STORAGE_KEY_TIPO_FLUXO, tipoFluxo)
+    }
+  }, [tipoFluxo])
+
+  // Salva estado de boards minimizados no localStorage quando mudar
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_MINIMIZED_BOARDS, JSON.stringify(minimizedBoards))
+  }, [minimizedBoards])
+
+  // Função para alternar estado minimizado/maximizado de um board
+  const toggleBoardMinimized = (boardId: number) => {
+    setMinimizedBoards(prev => ({
+      ...prev,
+      [boardId]: !prev[boardId]
+    }))
+  }
+
+  // Função para verificar se um board está minimizado
+  const isBoardMinimized = (boardId: number): boolean => {
+    return minimizedBoards[boardId] === true
+  }
+
+  // Fecha dropdown ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (isDropdownOpen && !target.closest('[data-search-dropdown]')) {
+        setIsDropdownOpen(false)
+      }
+    }
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [isDropdownOpen])
+
   // Constantes derivadas dos filters
   const selectedAgenteId = filters.selectedAgenteId || ''
   const selectedColaboradorId = filters.selectedColaboradorId || ''
-  const searchTerm = filters.nome_razao_social || ''
+
+  // Funções auxiliares para busca dinâmica
+  const getSearchValue = (): string => {
+    switch (searchType) {
+      case 'nome':
+        return filters.nome_razao_social || ''
+      case 'email':
+        return filters.email || ''
+      case 'telefone':
+        return filters.telefone || ''
+      default:
+        return ''
+    }
+  }
+
+  const setSearchValue = (value: string) => {
+    const newFilters = { ...filters }
+    // Limpa os outros campos de busca
+    delete newFilters.nome_razao_social
+    delete newFilters.email
+    delete newFilters.telefone
+    
+    // Define o valor no campo correto
+    if (value.trim()) {
+      switch (searchType) {
+        case 'nome':
+          newFilters.nome_razao_social = value
+          break
+        case 'email':
+          newFilters.email = value
+          break
+        case 'telefone':
+          newFilters.telefone = value
+          break
+      }
+    }
+    setFilters(newFilters)
+    setCurrentPage(1)
+    queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
+  }
+
+  const getPlaceholder = (): string => {
+    switch (searchType) {
+      case 'nome':
+        return 'Buscar por nome...'
+      case 'email':
+        return 'Buscar por e-mail...'
+      case 'telefone':
+        return 'Buscar por telefone...'
+      default:
+        return 'Buscar por nome...'
+    }
+  }
+
+  const getSearchTypeLabel = (): string => {
+    switch (searchType) {
+      case 'nome':
+        return 'Nome'
+      case 'email':
+        return 'E-mail'
+      case 'telefone':
+        return 'Telefone'
+      default:
+        return 'Nome'
+    }
+  }
+
+  const handleSearchTypeChange = (newType: SearchType) => {
+    const currentValue = getSearchValue()
+    setIsDropdownOpen(false)
+    
+    // Cria novo objeto de filtros limpando os campos de busca anteriores
+    const newFilters = { ...filters }
+    delete newFilters.nome_razao_social
+    delete newFilters.email
+    delete newFilters.telefone
+    
+    // Mantém o valor digitado, apenas muda o campo que será usado
+    if (currentValue.trim()) {
+      switch (newType) {
+        case 'nome':
+          newFilters.nome_razao_social = currentValue
+          break
+        case 'email':
+          newFilters.email = currentValue
+          break
+        case 'telefone':
+          newFilters.telefone = currentValue
+          break
+      }
+    }
+    
+    setSearchType(newType)
+    setFilters(newFilters)
+    setCurrentPage(1)
+    queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
+  }
+
+  // Verificar se há filtros ativos (exceto campos de busca rápida)
+  const hasActiveFilters = Boolean(
+    filters.uf ||
+    filters.vendedor_id ||
+    filters.usuario_id_colaborador ||
+    filters.origem_lead ||
+    (filters.produtos && filters.produtos.length > 0)
+  )
+  
+  // Verificar se há qualquer filtro ativo (incluindo busca rápida)
+  const hasAnyFilter = Boolean(
+    getSearchValue().trim() ||
+    hasActiveFilters
+  )
 
   // Funções setters que atualizam filters e invalidam queries
   const setSelectedAgenteId = (value: string) => {
@@ -71,13 +267,10 @@ export default function KanbanColaborador() {
   const setSelectedColaboradorId = (value: string) => {
     setFilters(prev => ({ ...prev, selectedColaboradorId: value || undefined }))
     setCurrentPage(1)
+    // Limpa tipos disponíveis ao mudar colaborador para evitar exibir botões incorretos
+    setAvailableTypes([])
+    setTipoFluxo(null)
     queryClient.invalidateQueries({ queryKey: ['kanban-boards-colaborador'] })
-    queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
-  }
-
-  const setSearchTerm = (value: string) => {
-    setFilters(prev => ({ ...prev, nome_razao_social: value || undefined }))
-    setCurrentPage(1)
     queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
   }
 
@@ -97,6 +290,17 @@ export default function KanbanColaborador() {
   }, [openMenuLeadId])
   const [agentes, setAgentes] = useState<any[]>([])
   const [colaboradores, setColaboradores] = useState<any[]>([])
+  const [modelos, setModelos] = useState<any[]>([])
+
+  // Busca modelos
+  useEffect(() => {
+    api.get('/kanban-modelos')
+      .then((res) => setModelos(res.data))
+      .catch((error) => {
+        console.error('Erro ao carregar modelos:', error)
+        setModelos([])
+      })
+  }, [])
 
   // Busca agentes (se Admin ou Agente)
   useEffect(() => {
@@ -129,11 +333,11 @@ export default function KanbanColaborador() {
     (user?.perfil === 'ADMIN' && !!selectedAgenteId && !!selectedColaboradorId) || 
     (user?.perfil === 'AGENTE' && !!selectedColaboradorId)
 
-  // Helper para gerar queryKey base de leads (inclui contexto de colaborador/agente)
-  const getLeadsQueryKey = (boardsIds?: string, search?: string, page?: number) => {
-    const baseKey = ['kanban-board-leads-all-colaborador', colaboradorId, selectedAgenteId]
+  // Helper para gerar queryKey base de leads (inclui contexto de colaborador/agente e tipo_fluxo)
+  const getLeadsQueryKey = (boardsIds?: string, filtersData?: FilterLeadsDto, page?: number) => {
+    const baseKey = ['kanban-board-leads-all-colaborador', colaboradorId, selectedAgenteId, tipoFluxo]
     if (boardsIds !== undefined) baseKey.push(boardsIds)
-    if (search !== undefined) baseKey.push(search)
+    if (filtersData !== undefined) baseKey.push(JSON.stringify(filtersData))
     if (page !== undefined) baseKey.push(page)
     return baseKey
   }
@@ -143,12 +347,13 @@ export default function KanbanColaborador() {
     if (!shouldLoadBoards) {
       queryClient.removeQueries({ queryKey: ['kanban-boards-colaborador'] })
       queryClient.removeQueries({ queryKey: getLeadsQueryKey() })
+      setAvailableTypes([])
     }
   }, [shouldLoadBoards, queryClient, colaboradorId, selectedAgenteId])
 
-  // Busca boards
-  const { data: boards = [], isLoading: boardsLoading, error: boardsError } = useQuery<BoardWithLeadsCount[]>({
-    queryKey: ['kanban-boards-colaborador', colaboradorId, selectedAgenteId],
+  // Busca todos os boards (sem filtro tipo_fluxo) para determinar tipos disponíveis
+  const { data: allBoards = [] } = useQuery<BoardWithLeadsCount[]>({
+    queryKey: ['kanban-boards-colaborador-all', colaboradorId, selectedAgenteId],
     queryFn: async () => {
       const params = new URLSearchParams()
       if (user?.perfil === 'ADMIN' && selectedAgenteId) {
@@ -165,17 +370,110 @@ export default function KanbanColaborador() {
     retry: 1,
   })
 
+  // Determina tipos disponíveis baseado nos boards
+  useEffect(() => {
+    if (allBoards.length > 0) {
+      const tipos: ('COMPRADOR' | 'VENDEDOR')[] = []
+      
+      // Verifica cada board para determinar seu tipo_fluxo
+      allBoards.forEach(board => {
+        let boardTipoFluxo: 'COMPRADOR' | 'VENDEDOR' | null = board.tipo_fluxo as 'COMPRADOR' | 'VENDEDOR' | null
+        
+        // Se não tiver tipo_fluxo no board, busca do modelo (se modelos já foram carregados)
+        if (!boardTipoFluxo && board.kanban_modelo_id && modelos.length > 0) {
+          const modelo = modelos.find(m => m.kanban_modelo_id === board.kanban_modelo_id)
+          if (modelo?.tipo_fluxo) {
+            boardTipoFluxo = modelo.tipo_fluxo
+          }
+        }
+        
+        if (boardTipoFluxo === 'COMPRADOR' && !tipos.includes('COMPRADOR')) {
+          tipos.push('COMPRADOR')
+        } else if (boardTipoFluxo === 'VENDEDOR' && !tipos.includes('VENDEDOR')) {
+          tipos.push('VENDEDOR')
+        }
+      })
+      
+      // Ordena: COMPRADOR primeiro, depois VENDEDOR
+      const sortedTipos: ('COMPRADOR' | 'VENDEDOR')[] = []
+      if (tipos.includes('COMPRADOR')) sortedTipos.push('COMPRADOR')
+      if (tipos.includes('VENDEDOR')) sortedTipos.push('VENDEDOR')
+      
+      setAvailableTypes(sortedTipos)
+      
+      // Define default do tipoFluxo se não estiver definido ou se o tipo atual não estiver disponível
+      if (sortedTipos.length > 0) {
+        if (!tipoFluxo || !sortedTipos.includes(tipoFluxo)) {
+          // Default: COMPRADOR se disponível, senão o primeiro disponível
+          const defaultTipo = sortedTipos.includes('COMPRADOR') ? 'COMPRADOR' : sortedTipos[0]
+          setTipoFluxo(defaultTipo)
+        }
+      } else {
+        setTipoFluxo(null)
+      }
+    } else if (allBoards.length === 0 && shouldLoadBoards) {
+      // Se não houver boards, limpa tipos disponíveis
+      setAvailableTypes([])
+      setTipoFluxo(null)
+    }
+  }, [allBoards, modelos, shouldLoadBoards, tipoFluxo])
+
+  // Busca boards filtrados por tipo_fluxo
+  const { data: boards = [], isLoading: boardsLoading, error: boardsError } = useQuery<BoardWithLeadsCount[]>({
+    queryKey: ['kanban-boards-colaborador', colaboradorId, selectedAgenteId, tipoFluxo],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (user?.perfil === 'ADMIN' && selectedAgenteId) {
+        params.append('agente_id', selectedAgenteId)
+      }
+      if (colaboradorId) {
+        params.append('colaborador_id', colaboradorId.toString())
+      }
+      if (tipoFluxo) {
+        params.append('tipo_fluxo', tipoFluxo)
+      }
+      const queryString = params.toString()
+      const response = await api.get(`/kanban-boards/colaborador${queryString ? `?${queryString}` : ''}`)
+      return response.data || []
+    },
+    enabled: shouldLoadBoards && !!tipoFluxo,
+    retry: 1,
+  })
+
   // Busca leads de todos os boards automaticamente
   const boardLeadsQueries = useQuery({
-    queryKey: getLeadsQueryKey(boards.map(b => b.id).sort().join(','), searchTerm, currentPage),
+    queryKey: getLeadsQueryKey(boards.map(b => b.id).sort().join(','), filters as FilterLeadsDto, currentPage),
     queryFn: async () => {
       if (boards.length === 0) return {}
       const leadsPromises = boards.map(board => {
         const params = new URLSearchParams()
         params.append('page', currentPage.toString())
         params.append('limit', '50')
-        if (searchTerm.trim()) {
-          params.append('nome', searchTerm.trim())
+        if (filters.nome_razao_social) {
+          params.append('nome_razao_social', filters.nome_razao_social)
+        }
+        if (filters.email) {
+          params.append('email', filters.email)
+        }
+        if (filters.telefone) {
+          params.append('telefone', filters.telefone)
+        }
+        if (filters.uf) {
+          params.append('uf', filters.uf)
+        }
+        if (filters.vendedor_id) {
+          params.append('vendedor_id', filters.vendedor_id.toString())
+        }
+        if (filters.usuario_id_colaborador) {
+          params.append('usuario_id_colaborador', filters.usuario_id_colaborador.toString())
+        }
+        if (filters.origem_lead) {
+          params.append('origem_lead', filters.origem_lead)
+        }
+        if (filters.produtos && filters.produtos.length > 0) {
+          filters.produtos.forEach(produtoId => {
+            params.append('produtos', produtoId.toString())
+          })
         }
         return api.get(`/kanban-boards/${board.id}/leads?${params.toString()}`)
           .then(res => ({ boardId: board.id, data: res.data }))
@@ -186,7 +484,7 @@ export default function KanbanColaborador() {
       
       // Pega dados anteriores do cache
       const previousData = queryClient.getQueryData<Record<number, { data: Lead[]; total: number; page: number }>>(
-        getLeadsQueryKey(boards.map(b => b.id).sort().join(','), searchTerm, currentPage - 1)
+        getLeadsQueryKey(boards.map(b => b.id).sort().join(','), filters as FilterLeadsDto, currentPage - 1)
       ) || {}
       
       results.forEach(({ boardId, data }) => {
@@ -277,16 +575,6 @@ export default function KanbanColaborador() {
     },
   })
 
-  const deleteBoardMutation = useMutation({
-    mutationFn: async (boardId: number) => {
-      return api.delete(`/kanban-boards/${boardId}`)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['kanban-boards-colaborador'] })
-      queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
-    },
-  })
-
   const handleDragStart = (e: React.DragEvent, lead: Lead, boardId: number) => {
     setDraggedLead(lead)
     setDraggedFromBoardId(boardId)
@@ -319,17 +607,6 @@ export default function KanbanColaborador() {
     }
   }
 
-  const handleDeleteBoard = async (boardId: number) => {
-    if (!confirm('Tem certeza que deseja excluir este board?')) return
-    try {
-      await deleteBoardMutation.mutateAsync(boardId)
-      toast.success('Board excluído com sucesso!')
-    } catch (error: any) {
-      // Erro já é tratado pelo interceptor do axios
-      console.error('Erro ao excluir board:', error)
-    }
-  }
-
   const handleExibir = () => {
     if (user?.perfil === 'ADMIN' && (!selectedAgenteId || !selectedColaboradorId)) {
       toast.warning('Selecione um Agente e um Colaborador para exibir')
@@ -355,7 +632,67 @@ export default function KanbanColaborador() {
   return (
     <div className="kanban-container">
       <div className="kanban-header">
-        <h1>Funil de vendas - Kanban</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <h1>Funil</h1>
+          {/* Botões COMPRADOR/VENDEDOR */}
+          {/* Admin: mostra apenas se Agente E Colaborador estiverem selecionados */}
+          {/* Agente: mostra apenas se Colaborador estiver selecionado */}
+          {/* Colaborador: mostra sempre que houver tipos disponíveis */}
+          {(
+            (user?.perfil === 'ADMIN' && selectedAgenteId && selectedColaboradorId && availableTypes.length > 0) ||
+            (user?.perfil === 'AGENTE' && selectedColaboradorId && availableTypes.length > 0) ||
+            (user?.perfil === 'COLABORADOR' && availableTypes.length > 0)
+          ) && (
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              {availableTypes.includes('COMPRADOR') && (
+                <button
+                  onClick={() => {
+                    setTipoFluxo('COMPRADOR')
+                    setCurrentPage(1)
+                    queryClient.invalidateQueries({ queryKey: ['kanban-boards-colaborador'] })
+                    queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
+                  }}
+                  style={{
+                    backgroundColor: tipoFluxo === 'COMPRADOR' ? '#3498db' : 'white',
+                    color: tipoFluxo === 'COMPRADOR' ? 'white' : '#333',
+                    border: tipoFluxo === 'COMPRADOR' ? 'none' : '1px solid #ddd',
+                    borderRadius: '20px',
+                    padding: '8px 20px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: tipoFluxo === 'COMPRADOR' ? 'bold' : 'normal',
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  Comprador
+                </button>
+              )}
+              {availableTypes.includes('VENDEDOR') && (
+                <button
+                  onClick={() => {
+                    setTipoFluxo('VENDEDOR')
+                    setCurrentPage(1)
+                    queryClient.invalidateQueries({ queryKey: ['kanban-boards-colaborador'] })
+                    queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
+                  }}
+                  style={{
+                    backgroundColor: tipoFluxo === 'VENDEDOR' ? '#3498db' : 'white',
+                    color: tipoFluxo === 'VENDEDOR' ? 'white' : '#333',
+                    border: tipoFluxo === 'VENDEDOR' ? 'none' : '1px solid #ddd',
+                    borderRadius: '20px',
+                    padding: '8px 20px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: tipoFluxo === 'VENDEDOR' ? 'bold' : 'normal',
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  Vendedor
+                </button>
+              )}
+            </div>
+          )}
+        </div>
         <div className="kanban-header-actions">
           {user?.perfil === 'ADMIN' && (
             <>
@@ -400,148 +737,351 @@ export default function KanbanColaborador() {
               ))}
             </select>
           )}
-          <input
-            type="text"
-            placeholder="Buscar por nome..."
-            className="kanban-search"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          {/* Botão Filtros */}
+          <button
+            onClick={() => setShowFiltersModal(true)}
+            className="btn-filters"
+            style={{ 
+              backgroundColor: hasActiveFilters ? '#3498db' : '#95a5a6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              whiteSpace: 'nowrap',
+              padding: '8px 16px',
+              position: 'relative'
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+            </svg>
+            <span className="btn-filters-text">Filtros</span>
+            {hasActiveFilters && (
+              <span style={{
+                position: 'absolute',
+                top: '-4px',
+                right: '-4px',
+                backgroundColor: '#ff6b35',
+                borderRadius: '50%',
+                width: '12px',
+                height: '12px',
+                border: '2px solid white'
+              }} />
+            )}
+          </button>
+          {/* Dropdown e Campo de busca rápida */}
+          <div data-search-dropdown style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            {/* Botão dropdown para selecionar tipo de busca */}
+            <button
+              type="button"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              style={{
+                backgroundColor: 'rgb(149, 165, 166)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px 0 0 4px',
+                cursor: 'pointer',
+                padding: '8px 12px',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                whiteSpace: 'nowrap',
+                borderRight: '1px solid rgb(149, 165, 166)'
+              }}
+            >
+              <span>{getSearchTypeLabel()}</span>
+              <svg 
+                width="12" 
+                height="12" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                style={{
+                  transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease'
+                }}
+              >
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            
+            {/* Dropdown menu */}
+            {isDropdownOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: '4px',
+                  backgroundColor: 'white',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  zIndex: 1000,
+                  minWidth: '120px'
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleSearchTypeChange('nome')}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    backgroundColor: searchType === 'nome' ? '#e3f2fd' : 'white',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (searchType !== 'nome') {
+                      e.currentTarget.style.backgroundColor = '#f5f5f5'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (searchType !== 'nome') {
+                      e.currentTarget.style.backgroundColor = 'white'
+                    }
+                  }}
+                >
+                  Nome
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSearchTypeChange('email')}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    borderTop: '1px solid #eee',
+                    backgroundColor: searchType === 'email' ? '#e3f2fd' : 'white',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (searchType !== 'email') {
+                      e.currentTarget.style.backgroundColor = '#f5f5f5'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (searchType !== 'email') {
+                      e.currentTarget.style.backgroundColor = 'white'
+                    }
+                  }}
+                >
+                  E-mail
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSearchTypeChange('telefone')}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    borderTop: '1px solid #eee',
+                    backgroundColor: searchType === 'telefone' ? '#e3f2fd' : 'white',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (searchType !== 'telefone') {
+                      e.currentTarget.style.backgroundColor = '#f5f5f5'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (searchType !== 'telefone') {
+                      e.currentTarget.style.backgroundColor = 'white'
+                    }
+                  }}
+                >
+                  Telefone
+                </button>
+              </div>
+            )}
+
+            {/* Campo de busca */}
+            <input
+              type="text"
+              placeholder={getPlaceholder()}
+              className="kanban-search"
+              value={getSearchValue()}
+              onChange={(e) => setSearchValue(e.target.value)}
+              style={{
+                borderTop: '1px solid rgb(149, 165, 166)',
+                borderRight: '1px solid rgb(149, 165, 166)',
+                borderBottom: '1px solid rgb(149, 165, 166)',
+                borderLeft: 'none',
+                borderRadius: '0 4px 4px 0',
+                height: '31px'
+              }}
+            />
+          </div>
           <button className="btn-exibir" onClick={handleExibir}>Exibir</button>
         </div>
       </div>
 
-      {(user?.perfil === 'COLABORADOR' || 
-        (user?.perfil === 'ADMIN' && selectedAgenteId && selectedColaboradorId) ||
-        (user?.perfil === 'AGENTE' && selectedColaboradorId)) && (
+      {((user?.perfil === 'COLABORADOR' && tipoFluxo) || 
+        (user?.perfil === 'ADMIN' && selectedAgenteId && selectedColaboradorId && tipoFluxo) ||
+        (user?.perfil === 'AGENTE' && selectedColaboradorId && tipoFluxo)) && (
         <div className="kanban-boards-container">
-          {boards.map((board) => (
-            <div
-              key={board.id}
-              className="kanban-board"
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, board.id)}
-            >
+          {boards.map((board) => {
+            const isMinimized = isBoardMinimized(board.id)
+            return (
               <div
-                className="kanban-board-header"
-                style={{ backgroundColor: board.cor_hex, color: 'black' }}
+                key={board.id}
+                className={`kanban-board ${isMinimized ? 'kanban-board-minimized' : 'kanban-board-maximized'}`}
+                onDragOver={!isMinimized ? handleDragOver : undefined}
+                onDrop={!isMinimized ? (e) => handleDrop(e, board.id) : undefined}
               >
-                <span className="board-name">{board.nome}</span>
-                <span className="board-count">{board.leads_count || 0}</span>
-                {board.nome !== 'NOVOS' && board.leads_count === 0 && (user?.perfil === 'ADMIN' || user?.perfil === 'AGENTE') && (
-                  <button
-                    className="btn-delete-board"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDeleteBoard(board.id)
-                    }}
-                    title="Excluir board"
-                  >
-                    🗑️
-                  </button>
-                )}
-              </div>
+                <div
+                  className="kanban-board-header"
+                  style={{ backgroundColor: board.cor_hex, color: 'black' }}
+                  onDoubleClick={() => toggleBoardMinimized(board.id)}
+                  title={board.nome}
+                >
+                  <span className="board-name" title={board.nome}>{board.nome}</span>
+                  {!isMinimized && (
+                    <div>
+                      <button
+                        className="btn-add-lead"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedBoardForNewLead(board.id)
+                        }}
+                        title="Novo Lead"
+                      >
+                        +
+                      </button>
+                      <span className="board-count">
+                        {hasAnyFilter && boardLeads[board.id]?.total !== undefined
+                          ? `${boardLeads[board.id].total} de ${board.leads_count || 0}`
+                          : board.leads_count || 0}
+                      </span>
+                    </div>
+                  )}
+                </div>
               <div
                 className="kanban-board-content"
                 style={{ backgroundColor: `${board.cor_hex}99` }}
               >
-                {boardLeadsQueries.isLoading ? (
+                {!isMinimized && boardLeadsQueries.isLoading ? (
                   <div>Carregando...</div>
                 ) : (
                   <>
-                    {(boardLeads[board.id]?.data || []).map((lead) => (
-                      <div
-                        key={lead.id}
-                        className="kanban-card"
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, lead, board.id)}
-                      >
-                        <div className="card-header">
-                          <div className="card-name">
-                            {lead.nome_fantasia_apelido || lead.nome_razao_social}
-                          </div>
-                          <div className="card-menu-container">
-                            <button
-                              className="card-menu-icon"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setOpenMenuLeadId(openMenuLeadId === lead.id ? null : lead.id)
-                              }}
-                              title="Menu"
-                            >
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="12" cy="5" r="1"></circle>
-                                <circle cx="12" cy="12" r="1"></circle>
-                                <circle cx="12" cy="19" r="1"></circle>
-                              </svg>
-                            </button>
-                            {openMenuLeadId === lead.id && (
-                              <div className="card-menu-dropdown" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  className="card-menu-item"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setEditingLead(lead)
-                                    setOpenMenuLeadId(null)
-                                  }}
-                                >
-                                  Editar Lead
-                                </button>
-                                <button
-                                  className="card-menu-item"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setSelectedLeadForOccurrences(lead)
-                                    setOpenMenuLeadId(null)
-                                  }}
-                                >
-                                  Ocorrências
-                                </button>
-                                <button
-                                  className="card-menu-item"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setSelectedLeadForSchedule(lead)
-                                    setOpenMenuLeadId(null)
-                                  }}
-                                >
-                                  Agendar contato
-                                </button>
+                    {(boardLeads[board.id]?.data || []).map((lead) => {
+                      const leadTooltip = [
+                        lead.nome_razao_social,
+                        lead.nome_fantasia_apelido
+                      ].filter(Boolean).join(' - ')
+                      return (
+                        <div
+                          key={lead.id}
+                          className={`kanban-card ${isMinimized ? 'kanban-card-minimized' : ''}`}
+                          draggable={!isMinimized}
+                          onDragStart={!isMinimized ? (e) => handleDragStart(e, lead, board.id) : undefined}
+                          title={leadTooltip}
+                        >
+                          {!isMinimized && (
+                            <div className="card-header">
+                              <div className="card-name">
+                                {lead.nome_fantasia_apelido || lead.nome_razao_social}
                               </div>
-                            )}
-                          </div>
-                        </div>
-                        {lead.nome_fantasia_apelido && (
-                          <div className="card-subtitle">{lead.nome_razao_social}</div>
-                        )}
-                        {lead.produtos && lead.produtos.length > 0 && (
-                          <div className="card-product-tags">
-                            {lead.produtos.map((produto) => (
-                              <span key={produto.produto_id} className="card-product-tag">
-                                {produto.descricao}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <div className="card-footer">
-                          <AppointmentBadge leadId={lead.id} />
-                          {lead.data_entrada && (
-                            <span 
-                              className="card-data-entrada"
-                              title="Data de entrada do lead"
-                            >
-                              {new Date(lead.data_entrada).toLocaleDateString('pt-BR')}
-                            </span>
+                              <div className="card-menu-container">
+                                <button
+                                  className="card-menu-icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setOpenMenuLeadId(openMenuLeadId === lead.id ? null : lead.id)
+                                  }}
+                                  title="Menu"
+                                >
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="5" r="1"></circle>
+                                    <circle cx="12" cy="12" r="1"></circle>
+                                    <circle cx="12" cy="19" r="1"></circle>
+                                  </svg>
+                                </button>
+                                {openMenuLeadId === lead.id && (
+                                  <div className="card-menu-dropdown" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      className="card-menu-item"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setEditingLead(lead)
+                                        setOpenMenuLeadId(null)
+                                      }}
+                                    >
+                                      Editar Lead
+                                    </button>
+                                    <button
+                                      className="card-menu-item"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setSelectedLeadForOccurrences(lead)
+                                        setOpenMenuLeadId(null)
+                                      }}
+                                    >
+                                      Ocorrências
+                                    </button>
+                                    <button
+                                      className="card-menu-item"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setSelectedLeadForSchedule(lead)
+                                        setOpenMenuLeadId(null)
+                                      }}
+                                    >
+                                      Agendar contato
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {!isMinimized && lead.nome_fantasia_apelido && (
+                            <div className="card-subtitle">{lead.nome_razao_social}</div>
+                          )}
+                          {!isMinimized && lead.produtos && lead.produtos.length > 0 && (
+                            <div className="card-product-tags">
+                              {lead.produtos.map((produto) => (
+                                <span key={produto.produto_id} className="card-product-tag">
+                                  {produto.descricao}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {!isMinimized && (
+                            <div className="card-footer">
+                              <AppointmentBadge leadId={lead.id} />
+                              {lead.data_entrada && (
+                                <span 
+                                  className="card-data-entrada"
+                                  title="Data de entrada do lead"
+                                >
+                                  {new Date(lead.data_entrada).toLocaleDateString('pt-BR')}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
-                      </div>
-                    ))}
-                    {(() => {
+                      )
+                    })}
+                    {!isMinimized && (() => {
                       const boardData = boardLeads[board.id]
                       const total = boardData?.total || 0
                       const currentCount = boardData?.data?.length || 0
                       const hasMore = total > currentCount
-                      const showButton = hasMore && (currentCount >= 50 || searchTerm.trim())
+                      const showButton = hasMore && (currentCount >= 50 || filters.nome_razao_social || hasActiveFilters)
                       
                       return showButton ? (
                         <button 
@@ -552,8 +1092,31 @@ export default function KanbanColaborador() {
                               const params = new URLSearchParams()
                               params.append('page', nextPage.toString())
                               params.append('limit', '50')
-                              if (searchTerm.trim()) {
-                                params.append('nome', searchTerm.trim())
+                              if (filters.nome_razao_social) {
+                                params.append('nome_razao_social', filters.nome_razao_social)
+                              }
+                              if (filters.email) {
+                                params.append('email', filters.email)
+                              }
+                              if (filters.telefone) {
+                                params.append('telefone', filters.telefone)
+                              }
+                              if (filters.uf) {
+                                params.append('uf', filters.uf)
+                              }
+                              if (filters.vendedor_id) {
+                                params.append('vendedor_id', filters.vendedor_id.toString())
+                              }
+                              if (filters.usuario_id_colaborador) {
+                                params.append('usuario_id_colaborador', filters.usuario_id_colaborador.toString())
+                              }
+                              if (filters.origem_lead) {
+                                params.append('origem_lead', filters.origem_lead)
+                              }
+                              if (filters.produtos && filters.produtos.length > 0) {
+                                filters.produtos.forEach(produtoId => {
+                                  params.append('produtos', produtoId.toString())
+                                })
                               }
                               return api.get(`/kanban-boards/${board.id}/leads?${params.toString()}`)
                                 .then(res => ({ boardId: board.id, data: res.data }))
@@ -561,7 +1124,7 @@ export default function KanbanColaborador() {
                             })
                             const results = await Promise.all(leadsPromises)
                             
-                            const nextQueryKey = getLeadsQueryKey(boards.map(b => b.id).sort().join(','), searchTerm, nextPage)
+                            const nextQueryKey = getLeadsQueryKey(boards.map(b => b.id).sort().join(','), filters as FilterLeadsDto, nextPage)
                             const currentData = boardLeads
                             const newData: Record<number, { data: Lead[]; total: number; page: number }> = {}
                             
@@ -586,7 +1149,8 @@ export default function KanbanColaborador() {
                 )}
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -623,6 +1187,45 @@ export default function KanbanColaborador() {
           onClose={() => setSelectedLeadForSchedule(null)}
           invalidateQueries={['kanban-board-leads-all-colaborador']}
         />
+      )}
+
+      {/* Modal de Filtros */}
+      <FiltersModal
+        isOpen={showFiltersModal}
+        onClose={() => setShowFiltersModal(false)}
+        filters={filters as FilterLeadsDto}
+        onFiltersChange={(newFilters) => setFilters(prev => ({ ...prev, ...newFilters }))}
+        onApply={() => {
+          setCurrentPage(1)
+          queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
+        }}
+        onClear={() => {
+          setFilters({})
+          setCurrentPage(1)
+          queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
+        }}
+        agentes={user?.perfil === 'ADMIN' ? agentes : []}
+        colaboradores={colaboradores}
+        isAdmin={user?.perfil === 'ADMIN'}
+        isAgente={user?.perfil === 'AGENTE'}
+      />
+
+      {/* Modal de Criação de Lead */}
+      {selectedBoardForNewLead && (
+        <div className="modal-overlay" onClick={() => setSelectedBoardForNewLead(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%' }}>
+            <CreateLeadInBoardModal
+              boardId={selectedBoardForNewLead}
+              onClose={() => setSelectedBoardForNewLead(null)}
+              onSuccess={() => {
+                setSelectedBoardForNewLead(null)
+                setCurrentPage(1)
+                queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
+              }}
+              invalidateQueries={['kanban-board-leads-all-colaborador']}
+            />
+          </div>
+        </div>
       )}
     </div>
   )

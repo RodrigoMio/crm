@@ -158,3 +158,6 @@ ls -la dist/
 ### Problema: Erro 500 após upload
 - **Solução:** Verificar permissões do `.htaccess` (deve ser 644) e sintaxe do arquivo
 
+
+
+

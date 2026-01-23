@@ -11,6 +11,9 @@ import FiltersModal from '../components/FiltersModal'
 import './LeadsList.css'
 
 const STORAGE_KEY_FILTERS = 'leads-filters'
+const STORAGE_KEY_SEARCH_TYPE = 'leads-search-type'
+
+type SearchType = 'nome' | 'email' | 'telefone'
 
 export default function LeadsList() {
   const { user } = useAuth()
@@ -29,6 +32,15 @@ export default function LeadsList() {
     }
     return {}
   })
+
+  // Carrega tipo de busca do localStorage (padrão: 'nome')
+  const [searchType, setSearchType] = useState<SearchType>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_SEARCH_TYPE)
+    return (saved as SearchType) || 'nome'
+  })
+
+  // Estado para controlar abertura do dropdown
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   
   const [agentes, setAgentes] = useState<any[]>([])
   const [colaboradores, setColaboradores] = useState<any[]>([])
@@ -41,12 +53,44 @@ export default function LeadsList() {
   const [idFinal, setIdFinal] = useState<string>('')
   const [showFiltersModal, setShowFiltersModal] = useState(false)
   const [expandedCardId, setExpandedCardId] = useState<number | null>(null)
+  const [tipoLead, setTipoLead] = useState<'COMPRADOR' | 'VENDEDOR' | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Salva filtros no localStorage quando mudarem
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(filters))
   }, [filters])
+
+  // Salva tipo de busca no localStorage quando mudar
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_SEARCH_TYPE, searchType)
+  }, [searchType])
+
+  // Sincroniza tipoLead com os filtros
+  useEffect(() => {
+    if (filters.tipo_lead) {
+      setTipoLead(filters.tipo_lead as 'COMPRADOR' | 'VENDEDOR')
+    } else {
+      setTipoLead(null)
+    }
+  }, [filters.tipo_lead])
+
+  // Fecha dropdown ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (isDropdownOpen && !target.closest('[data-search-dropdown]')) {
+        setIsDropdownOpen(false)
+      }
+    }
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [isDropdownOpen])
   
   // Busca o maior ID cadastrado para referência na importação
   const { data: maxIdData } = useQuery<{ maxId: number }>({
@@ -60,6 +104,99 @@ export default function LeadsList() {
   })
 
   const maxId = maxIdData?.maxId || 0
+
+  // Funções auxiliares para busca dinâmica
+  const getSearchValue = (): string => {
+    switch (searchType) {
+      case 'nome':
+        return filters.nome_razao_social || ''
+      case 'email':
+        return filters.email || ''
+      case 'telefone':
+        return filters.telefone || ''
+      default:
+        return ''
+    }
+  }
+
+  const setSearchValue = (value: string) => {
+    const newFilters = { ...filters }
+    // Limpa os outros campos de busca
+    delete newFilters.nome_razao_social
+    delete newFilters.email
+    delete newFilters.telefone
+    
+    // Define o valor no campo correto
+    if (value.trim()) {
+      switch (searchType) {
+        case 'nome':
+          newFilters.nome_razao_social = value
+          break
+        case 'email':
+          newFilters.email = value
+          break
+        case 'telefone':
+          newFilters.telefone = value
+          break
+      }
+    }
+    setFilters(newFilters)
+  }
+
+  const getPlaceholder = (): string => {
+    switch (searchType) {
+      case 'nome':
+        return 'Buscar por nome...'
+      case 'email':
+        return 'Buscar por e-mail...'
+      case 'telefone':
+        return 'Buscar por telefone...'
+      default:
+        return 'Buscar por nome...'
+    }
+  }
+
+  const getSearchTypeLabel = (): string => {
+    switch (searchType) {
+      case 'nome':
+        return 'Nome'
+      case 'email':
+        return 'E-mail'
+      case 'telefone':
+        return 'Telefone'
+      default:
+        return 'Nome'
+    }
+  }
+
+  const handleSearchTypeChange = (newType: SearchType) => {
+    const currentValue = getSearchValue()
+    setIsDropdownOpen(false)
+    
+    // Cria novo objeto de filtros limpando os campos de busca anteriores
+    const newFilters = { ...filters }
+    delete newFilters.nome_razao_social
+    delete newFilters.email
+    delete newFilters.telefone
+    
+    // Mantém o valor digitado, apenas muda o campo que será usado
+    if (currentValue.trim()) {
+      switch (newType) {
+        case 'nome':
+          newFilters.nome_razao_social = currentValue
+          break
+        case 'email':
+          newFilters.email = currentValue
+          break
+        case 'telefone':
+          newFilters.telefone = currentValue
+          break
+      }
+    }
+    
+    setSearchType(newType)
+    setFilters(newFilters)
+  }
   
   // Verificar se há filtros ativos (exceto nome_razao_social que é unificado com busca rápida)
   const hasActiveFilters = Boolean(
@@ -67,6 +204,7 @@ export default function LeadsList() {
     filters.vendedor_id ||
     filters.usuario_id_colaborador ||
     filters.origem_lead ||
+    filters.tipo_lead ||
     (filters.produtos && filters.produtos.length > 0)
   )
 
@@ -101,6 +239,12 @@ export default function LeadsList() {
       if (filters.nome_razao_social) {
         params.append('nome_razao_social', filters.nome_razao_social)
       }
+      if (filters.email) {
+        params.append('email', filters.email)
+      }
+      if (filters.telefone) {
+        params.append('telefone', filters.telefone)
+      }
       if (filters.uf) {
         params.append('uf', filters.uf)
       }
@@ -114,6 +258,9 @@ export default function LeadsList() {
         filters.produtos.forEach(produtoId => {
           params.append('produtos', produtoId.toString())
         })
+      }
+      if (filters.tipo_lead) {
+        params.append('tipo_lead', filters.tipo_lead)
       }
       params.append('page', currentPage.toString())
       params.append('limit', pageSize.toString())
@@ -288,7 +435,65 @@ export default function LeadsList() {
   return (
     <div className="leads-list">
       <div className="page-header">
-        <h1>Leads</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <h1>Leads</h1>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <button
+              onClick={() => {
+                const newFilters = { ...filters }
+                if (tipoLead === 'COMPRADOR') {
+                  // Se já está selecionado, remove o filtro
+                  delete newFilters.tipo_lead
+                } else {
+                  // Seleciona COMPRADOR
+                  newFilters.tipo_lead = 'COMPRADOR'
+                }
+                setFilters(newFilters)
+                setCurrentPage(1)
+              }}
+              style={{
+                backgroundColor: tipoLead === 'COMPRADOR' ? '#3498db' : 'white',
+                color: tipoLead === 'COMPRADOR' ? 'white' : '#333',
+                border: tipoLead === 'COMPRADOR' ? 'none' : '1px solid #ddd',
+                borderRadius: '20px',
+                padding: '8px 20px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: tipoLead === 'COMPRADOR' ? 'bold' : 'normal',
+                transition: 'all 0.3s ease',
+              }}
+            >
+              Comprador
+            </button>
+            <button
+              onClick={() => {
+                const newFilters = { ...filters }
+                if (tipoLead === 'VENDEDOR') {
+                  // Se já está selecionado, remove o filtro
+                  delete newFilters.tipo_lead
+                } else {
+                  // Seleciona VENDEDOR
+                  newFilters.tipo_lead = 'VENDEDOR'
+                }
+                setFilters(newFilters)
+                setCurrentPage(1)
+              }}
+              style={{
+                backgroundColor: tipoLead === 'VENDEDOR' ? '#3498db' : 'white',
+                color: tipoLead === 'VENDEDOR' ? 'white' : '#333',
+                border: tipoLead === 'VENDEDOR' ? 'none' : '1px solid #ddd',
+                borderRadius: '20px',
+                padding: '8px 20px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: tipoLead === 'VENDEDOR' ? 'bold' : 'normal',
+                transition: 'all 0.3s ease',
+              }}
+            >
+              Vendedor
+            </button>
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Botão Filtros (sempre visível) */}
           <button
@@ -326,22 +531,161 @@ export default function LeadsList() {
               }} />
             )}
           </button>
-          {/* Campo de busca rápida */}
-          <input
-            type="text"
-            placeholder="Buscar por nome..."
-            value={filters.nome_razao_social || ''}
-            onChange={(e) =>
-              setFilters({ ...filters, nome_razao_social: e.target.value || undefined })
-            }
-            style={{
-              padding: '8px 12px',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              fontSize: '14px',
-              minWidth: '200px'
-            }}
-          />
+          {/* Dropdown e Campo de busca rápida */}
+          <div data-search-dropdown style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            {/* Botão dropdown para selecionar tipo de busca */}
+            <button
+              type="button"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              style={{
+                backgroundColor: 'rgb(149, 165, 166)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px 0 0 4px',
+                cursor: 'pointer',
+                padding: '8px 12px',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                whiteSpace: 'nowrap',
+                borderRight: '1px solid rgb(149, 165, 166)'
+              }}
+            >
+              <span>{getSearchTypeLabel()}</span>
+              <svg 
+                width="12" 
+                height="12" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                style={{
+                  transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease'
+                }}
+              >
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            
+            {/* Dropdown menu */}
+            {isDropdownOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: '4px',
+                  backgroundColor: 'white',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  zIndex: 1000,
+                  minWidth: '120px'
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleSearchTypeChange('nome')}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    backgroundColor: searchType === 'nome' ? '#e3f2fd' : 'white',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (searchType !== 'nome') {
+                      e.currentTarget.style.backgroundColor = '#f5f5f5'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (searchType !== 'nome') {
+                      e.currentTarget.style.backgroundColor = 'white'
+                    }
+                  }}
+                >
+                  Nome
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSearchTypeChange('email')}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    borderTop: '1px solid #eee',
+                    backgroundColor: searchType === 'email' ? '#e3f2fd' : 'white',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (searchType !== 'email') {
+                      e.currentTarget.style.backgroundColor = '#f5f5f5'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (searchType !== 'email') {
+                      e.currentTarget.style.backgroundColor = 'white'
+                    }
+                  }}
+                >
+                  E-mail
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSearchTypeChange('telefone')}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    borderTop: '1px solid #eee',
+                    backgroundColor: searchType === 'telefone' ? '#e3f2fd' : 'white',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (searchType !== 'telefone') {
+                      e.currentTarget.style.backgroundColor = '#f5f5f5'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (searchType !== 'telefone') {
+                      e.currentTarget.style.backgroundColor = 'white'
+                    }
+                  }}
+                >
+                  Telefone
+                </button>
+              </div>
+            )}
+
+            {/* Campo de busca */}
+            <input
+              type="text"
+              placeholder={getPlaceholder()}
+              value={getSearchValue()}
+              onChange={(e) => setSearchValue(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                borderTop: '1px solid rgb(149, 165, 166)',
+                borderRight: '1px solid rgb(149, 165, 166)',
+                borderBottom: '1px solid rgb(149, 165, 166)',
+                borderLeft: 'none',
+                borderRadius: '0 4px 4px 0',
+                fontSize: '14px',
+                minWidth: '200px',
+                height: '31px'
+              }}
+            />
+          </div>
           <button
             onClick={() => setShowImportModal(true)}
             className="btn-import"
@@ -750,19 +1094,6 @@ export default function LeadsList() {
                           </div>
                         </td>
                       </tr>
-                      {lead.anotacoes && (
-                        <tr key={`${lead.id}-anotacoes`}>
-                          <td colSpan={user?.perfil === 'ADMIN' ? 12 : 11} style={{ 
-                            padding: '0.5rem 1rem', 
-                            backgroundColor: '#f9f9f9',
-                            borderTop: 'none',
-                            fontSize: '0.9rem',
-                            color: '#666'
-                          }}>
-                            <strong>Anotações:</strong> {lead.anotacoes}
-                          </td>
-                        </tr>
-                      )}
                     </>
                   ))
                 )}

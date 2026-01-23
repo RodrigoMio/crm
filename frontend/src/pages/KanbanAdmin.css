@@ -51,7 +51,7 @@
 
 .kanban-boards-container {
   display: flex;
-  gap: 20px;
+  gap: 10px;
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 20px;
@@ -74,7 +74,7 @@
 }
 
 .kanban-board-header {
-  padding: 12px 16px;
+  padding: 5px 7px;
   border-radius: 8px 8px 0 0;
   display: flex;
   justify-content: space-between;
@@ -109,7 +109,7 @@
 }
 
 .kanban-board-content {
-  padding: 16px;
+  padding: 15px 4px;
   min-height: calc(100% - 23px);;
   max-height: 600px;
   overflow-y: auto;

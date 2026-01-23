@@ -147,3 +147,6 @@ Após o upload:
 - **Sempre faça build** antes de fazer upload (o CSS fonte não é usado em produção)
 - Faça upload de **todos os arquivos** de `dist/`, não apenas o CSS
 - O Vite gera nomes de arquivo com hash (ex: `index-abc123.css`), então você precisa atualizar todos os assets
+
+
+

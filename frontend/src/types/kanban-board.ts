@@ -20,6 +20,7 @@ export interface KanbanBoard {
   created_at: string;
   updated_at: string;
   leads_count?: number;
+  tipo_fluxo?: 'COMPRADOR' | 'VENDEDOR' | null;
 }
 
 export interface BoardWithLeadsCount extends KanbanBoard {
@@ -36,6 +37,7 @@ export interface CreateKanbanBoardDto {
   kanban_status_id?: number;
   tipo: KanbanBoardType;
   ordem?: number;
+  tipo_fluxo?: 'COMPRADOR' | 'VENDEDOR';
 }
 
 export interface UpdateKanbanBoardDto {

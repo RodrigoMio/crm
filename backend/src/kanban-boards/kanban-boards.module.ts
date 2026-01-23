@@ -10,6 +10,7 @@ import { KanbanModeloStatus } from '../kanban-modelos/entities/kanban-modelo-sta
 import { KanbanStatus } from '../kanban-modelos/entities/kanban-status.entity';
 import { Occurrence } from '../occurrences/entities/occurrence.entity';
 import { LeadsProduto } from '../leads-produtos/entities/leads-produto.entity';
+import { Produto } from '../produtos/entities/produto.entity';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { LeadsProduto } from '../leads-produtos/entities/leads-produto.entity';
       KanbanStatus,
       Occurrence,
       LeadsProduto,
+      Produto,
     ]),
   ],
   controllers: [KanbanBoardsController],
@@ -29,7 +31,3 @@ import { LeadsProduto } from '../leads-produtos/entities/leads-produto.entity';
   exports: [KanbanBoardsService],
 })
 export class KanbanBoardsModule {}
-
-
-
-

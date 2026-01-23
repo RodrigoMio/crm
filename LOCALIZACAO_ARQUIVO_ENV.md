@@ -152,3 +152,6 @@ O arquivo `.env` contém informações sensíveis (senhas, tokens). Sempre:
 **Pronto!** 🎉 O arquivo `.env` deve estar no mesmo diretório que o `server.js`.
 
 
+
+
+

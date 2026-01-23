@@ -36,7 +36,7 @@ export class Appointment {
   @JoinColumn({ name: 'usuario_id' })
   usuario: User;
 
-  @Column({ type: 'timestamptz' })
+  @Column({ type: 'timestamptz', nullable: true })
   data_agendamento: Date;
 
   @Column({
@@ -54,5 +54,8 @@ export class Appointment {
   @UpdateDateColumn()
   updated_at: Date;
 }
+
+
+
 
 

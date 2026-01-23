@@ -17,11 +17,14 @@ export class KanbanModelo {
   @Column({ type: 'boolean', nullable: true, default: true })
   active: boolean;
 
+  @Column({
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+    name: 'tipo_fluxo',
+  })
+  tipo_fluxo: 'COMPRADOR' | 'VENDEDOR' | null;
+
   @OneToMany(() => KanbanModeloStatus, (modeloStatus) => modeloStatus.kanbanModelo)
   modeloStatuses: KanbanModeloStatus[];
 }
-
-
-
-
-

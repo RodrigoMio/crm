@@ -1,6 +1,114 @@
 /* Reutiliza estilos do KanbanAdmin */
 @import './KanbanAdmin.css';
 
+/* Layout específico para KanbanColaborador - Nome do board em linha separada */
+.kanban-board-header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0px;
+  cursor: pointer;
+  min-height: 50px;
+  position: relative;
+}
+
+.board-name {
+  width: 100%;
+  display: block;
+}
+
+.board-count,
+.btn-delete-board {
+  align-self: flex-end;
+  margin-left: 0;
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.kanban-board-header > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Botão de adicionar lead - oculto por padrão, aparece no hover */
+.kanban-board-header > div .btn-add-lead {
+  background: transparent;
+  border: none;
+  color: #000000;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 18px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  transition: background-color 0.2s, opacity 0.2s;
+  opacity: 0;
+  flex-shrink: 0;
+  order: -1;
+}
+
+.kanban-board-header:hover > div .btn-add-lead {
+  opacity: 1;
+}
+
+.kanban-board-header > div .btn-add-lead:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Ajustes gerais */
+.kanban-card {
+  min-height: 20px;
+}
+
+/* Modo maximizado */
+.kanban-board-maximized {
+  width: 200px;
+  min-width: 200px;
+  max-width: 200px;
+}
+
+.kanban-board-maximized .board-name {
+  font-size: 13px;
+}
+
+/* Modo minimizado */
+.kanban-board-minimized {
+  width: 35px;
+  min-width: 35px;
+  max-width: 35px;
+}
+
+.kanban-board-minimized .board-name {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kanban-board-minimized .kanban-card {
+  min-height: 30px;
+}
+
+.kanban-board-minimized .kanban-card .card-header,
+.kanban-board-minimized .kanban-card .card-subtitle,
+.kanban-board-minimized .kanban-card .card-product-tags,
+.kanban-board-minimized .kanban-card .card-footer {
+  display: none;
+}
+
+.kanban-board-minimized .kanban-card {
+  cursor: default;
+}
+
+
+
+
 
 
 

@@ -237,3 +237,6 @@ Isso garantirá que cada combinação de Agente/Colaborador tenha sua própria q
 
 **Conclusão:** O problema NÃO é diretamente o localStorage, mas a queryKey que não diferencia entre diferentes Agentes/Colaboradores, causando cache compartilhado incorretamente.
 
+
+
+

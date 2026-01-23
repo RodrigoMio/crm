@@ -8,6 +8,7 @@ import {
   IsArray,
   MinLength,
   Length,
+  ValidateIf,
 } from 'class-validator';
 import { OrigemLead } from '../entities/lead.entity';
 
@@ -33,6 +34,7 @@ export class CreateLeadDto {
   email?: string;
 
   @IsOptional()
+  @ValidateIf((o) => o.uf !== '' && o.uf !== null && o.uf !== undefined)
   @IsString()
   @Length(2, 2, { message: 'UF deve ter exatamente 2 caracteres' })
   uf?: string;
@@ -61,4 +63,9 @@ export class CreateLeadDto {
   @IsArray()
   @IsInt({ each: true })
   produtos?: number[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tipo_lead?: string[];
 }

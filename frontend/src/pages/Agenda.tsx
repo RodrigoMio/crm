@@ -10,6 +10,7 @@ import WeekView from '../components/WeekView'
 import OccurrencesModal from '../components/OccurrencesModal'
 import EditLeadModal from '../components/EditLeadModal'
 import ScheduleContactModal from '../components/ScheduleContactModal'
+import ConfirmContactModal from '../components/ConfirmContactModal'
 import './Agenda.css'
 
 type ViewMode = 'month' | 'week'
@@ -68,6 +69,7 @@ export default function Agenda() {
   const [selectedLeadForOccurrences, setSelectedLeadForOccurrences] = useState<Lead | null>(null)
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
   const [selectedLeadForSchedule, setSelectedLeadForSchedule] = useState<Lead | null>(null)
+  const [selectedAppointmentForConfirm, setSelectedAppointmentForConfirm] = useState<Appointment | null>(null)
 
   // Estados para drag and drop
   const [draggedAppointment, setDraggedAppointment] = useState<Appointment | null>(null)
@@ -361,6 +363,7 @@ export default function Agenda() {
             onEdit={(lead) => setEditingLead(lead)}
             onOccurrences={(lead) => setSelectedLeadForOccurrences(lead)}
             onSchedule={(lead) => setSelectedLeadForSchedule(lead)}
+            onConfirm={(appointment) => setSelectedAppointmentForConfirm(appointment)}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             onDrop={handleDrop}
@@ -375,6 +378,7 @@ export default function Agenda() {
             onEdit={(lead) => setEditingLead(lead)}
             onOccurrences={(lead) => setSelectedLeadForOccurrences(lead)}
             onSchedule={(lead) => setSelectedLeadForSchedule(lead)}
+            onConfirm={(appointment) => setSelectedAppointmentForConfirm(appointment)}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             onDrop={handleDrop}
@@ -414,6 +418,15 @@ export default function Agenda() {
           leadId={selectedLeadForSchedule.id}
           leadName={selectedLeadForSchedule.nome_fantasia_apelido || selectedLeadForSchedule.nome_razao_social}
           onClose={() => setSelectedLeadForSchedule(null)}
+          invalidateQueries={['appointments']}
+        />
+      )}
+
+      {selectedAppointmentForConfirm && (
+        <ConfirmContactModal
+          appointmentId={selectedAppointmentForConfirm.id}
+          leadName={selectedAppointmentForConfirm.lead?.nome_fantasia_apelido || selectedAppointmentForConfirm.lead?.nome_razao_social || ''}
+          onClose={() => setSelectedAppointmentForConfirm(null)}
           invalidateQueries={['appointments']}
         />
       )}

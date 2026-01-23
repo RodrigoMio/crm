@@ -69,3 +69,6 @@ COMMENT ON COLUMN leads.usuario_id_colaborador IS 'Referência ao usuário Colab
 
 
 
+
+
+

@@ -90,7 +90,7 @@ export default function Layout() {
         )}
         {(user?.perfil === 'ADMIN' || user?.perfil === 'AGENTE' || user?.perfil === 'COLABORADOR') && (
           <Link to="/kanban-colaborador" className="nav-link" onClick={closeMobileMenu}>
-            Kanban (C)
+            Funil
           </Link>
         )}
         <Link to="/kanban-modelos" className="nav-link" onClick={closeMobileMenu}>

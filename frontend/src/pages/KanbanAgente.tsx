@@ -10,9 +10,14 @@ import EditLeadModal from '../components/EditLeadModal'
 import ScheduleContactModal from '../components/ScheduleContactModal'
 import AppointmentBadge from '../components/AppointmentBadge'
 import FiltersModal from '../components/FiltersModal'
+import CreateLeadInBoardModal from '../components/CreateLeadInBoardModal'
 import './KanbanAgente.css'
 
 const STORAGE_KEY_FILTERS = 'kanban-agente-filters'
+const STORAGE_KEY_SEARCH_TYPE = 'kanban-agente-search-type'
+const STORAGE_KEY_TIPO_FLUXO = 'kanban-agente-tipo-fluxo'
+
+type SearchType = 'nome' | 'email' | 'telefone'
 
 // Tipo estendido para incluir campos específicos da tela
 interface ExtendedFilters extends FilterLeadsDto {
@@ -29,21 +34,32 @@ export default function KanbanAgente() {
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
   const [selectedLeadForSchedule, setSelectedLeadForSchedule] = useState<Lead | null>(null)
   const [openMenuLeadId, setOpenMenuLeadId] = useState<number | null>(null)
-  const [searchTerm, setSearchTerm] = useState<string>('')
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [showFiltersModal, setShowFiltersModal] = useState(false)
+  const [availableTypes, setAvailableTypes] = useState<('COMPRADOR' | 'VENDEDOR')[]>([])
+  const [selectedBoardForNewLead, setSelectedBoardForNewLead] = useState<number | null>(null)
+  
+  // Carrega tipo de busca do localStorage (padrão: 'nome')
+  const [searchType, setSearchType] = useState<SearchType>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_SEARCH_TYPE)
+    return (saved as SearchType) || 'nome'
+  })
+
+  // Carrega tipo de fluxo do localStorage
+  const [tipoFluxo, setTipoFluxo] = useState<'COMPRADOR' | 'VENDEDOR' | null>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_TIPO_FLUXO)
+    return (saved === 'COMPRADOR' || saved === 'VENDEDOR') ? saved : null
+  })
+
+  // Estado para controlar abertura do dropdown
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   
   // Carrega filtros do localStorage na inicialização
   const [filters, setFilters] = useState<ExtendedFilters>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_FILTERS)
     if (saved) {
       try {
-        const parsed = JSON.parse(saved) as ExtendedFilters
-        // Sincroniza nome_razao_social com searchTerm
-        if (parsed.nome_razao_social) {
-          setSearchTerm(parsed.nome_razao_social)
-        }
-        return parsed
+        return JSON.parse(saved) as ExtendedFilters
       } catch {
         return {}
       }
@@ -54,9 +70,9 @@ export default function KanbanAgente() {
   // Sincroniza selectedAgenteId com filters
   const selectedAgenteId = filters.selectedAgenteId || ''
   
-  // Helper para gerar queryKey base de leads (inclui contexto de agente)
+  // Helper para gerar queryKey base de leads (inclui contexto de agente e tipo_fluxo)
   const getLeadsQueryKey = (boardsIds?: string, filtersData?: FilterLeadsDto, page?: number) => {
-    const baseKey: any[] = ['kanban-board-leads-all-agente', selectedAgenteId]
+    const baseKey: any[] = ['kanban-board-leads-all-agente', selectedAgenteId, tipoFluxo]
     if (boardsIds !== undefined) baseKey.push(boardsIds)
     if (filtersData !== undefined) baseKey.push(filtersData)
     if (page !== undefined) baseKey.push(page)
@@ -67,32 +83,144 @@ export default function KanbanAgente() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(filters))
   }, [filters])
-  
-  // Sincroniza searchTerm com filters.nome_razao_social (apenas quando searchTerm mudar)
+
+  // Salva tipo de busca no localStorage quando mudar
   useEffect(() => {
-    if (searchTerm !== (filters.nome_razao_social || '')) {
-      setFilters(prev => ({ ...prev, nome_razao_social: searchTerm || undefined }))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm])
-  
-  // Sincroniza filters.nome_razao_social com searchTerm quando filtros mudarem via modal
+    localStorage.setItem(STORAGE_KEY_SEARCH_TYPE, searchType)
+  }, [searchType])
+
+  // Salva tipo de fluxo no localStorage quando mudar
   useEffect(() => {
-    if (filters.nome_razao_social !== searchTerm) {
-      setSearchTerm(filters.nome_razao_social || '')
+    if (tipoFluxo) {
+      localStorage.setItem(STORAGE_KEY_TIPO_FLUXO, tipoFluxo)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.nome_razao_social])
+  }, [tipoFluxo])
+
+  // Fecha dropdown ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (isDropdownOpen && !target.closest('[data-search-dropdown]')) {
+        setIsDropdownOpen(false)
+      }
+    }
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [isDropdownOpen])
 
   // Função para atualizar selectedAgenteId
   const setSelectedAgenteId = (value: string) => {
     setFilters(prev => ({ ...prev, selectedAgenteId: value || undefined }))
     setCurrentPage(1)
+    // Limpa tipos disponíveis quando desmarca agente (Admin)
+    if (!value && user?.perfil === 'ADMIN') {
+      setAvailableTypes([])
+      setTipoFluxo(null)
+    }
     queryClient.invalidateQueries({ queryKey: ['kanban-boards-agente'] })
+    queryClient.invalidateQueries({ queryKey: ['kanban-boards-agente-all'] })
     queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
   }
   
-  // Verificar se há filtros ativos (exceto nome_razao_social)
+  // Funções auxiliares para busca dinâmica
+  const getSearchValue = (): string => {
+    switch (searchType) {
+      case 'nome':
+        return filters.nome_razao_social || ''
+      case 'email':
+        return filters.email || ''
+      case 'telefone':
+        return filters.telefone || ''
+      default:
+        return ''
+    }
+  }
+
+  const setSearchValue = (value: string) => {
+    const newFilters = { ...filters }
+    // Limpa os outros campos de busca
+    delete newFilters.nome_razao_social
+    delete newFilters.email
+    delete newFilters.telefone
+    
+    // Define o valor no campo correto
+    if (value.trim()) {
+      switch (searchType) {
+        case 'nome':
+          newFilters.nome_razao_social = value
+          break
+        case 'email':
+          newFilters.email = value
+          break
+        case 'telefone':
+          newFilters.telefone = value
+          break
+      }
+    }
+    setFilters(newFilters)
+  }
+
+  const getPlaceholder = (): string => {
+    switch (searchType) {
+      case 'nome':
+        return 'Buscar por nome...'
+      case 'email':
+        return 'Buscar por e-mail...'
+      case 'telefone':
+        return 'Buscar por telefone...'
+      default:
+        return 'Buscar por nome...'
+    }
+  }
+
+  const getSearchTypeLabel = (): string => {
+    switch (searchType) {
+      case 'nome':
+        return 'Nome'
+      case 'email':
+        return 'E-mail'
+      case 'telefone':
+        return 'Telefone'
+      default:
+        return 'Nome'
+    }
+  }
+
+  const handleSearchTypeChange = (newType: SearchType) => {
+    const currentValue = getSearchValue()
+    setIsDropdownOpen(false)
+    
+    // Cria novo objeto de filtros limpando os campos de busca anteriores
+    const newFilters = { ...filters }
+    delete newFilters.nome_razao_social
+    delete newFilters.email
+    delete newFilters.telefone
+    
+    // Mantém o valor digitado, apenas muda o campo que será usado
+    if (currentValue.trim()) {
+      switch (newType) {
+        case 'nome':
+          newFilters.nome_razao_social = currentValue
+          break
+        case 'email':
+          newFilters.email = currentValue
+          break
+        case 'telefone':
+          newFilters.telefone = currentValue
+          break
+      }
+    }
+    
+    setSearchType(newType)
+    setFilters(newFilters)
+  }
+
+  // Verificar se há filtros ativos (exceto campos de busca rápida)
   const hasActiveFilters = Boolean(
     filters.uf ||
     filters.vendedor_id ||
@@ -101,9 +229,9 @@ export default function KanbanAgente() {
     (filters.produtos && filters.produtos.length > 0)
   )
   
-  // Verificar se há qualquer filtro ativo (incluindo nome_razao_social)
+  // Verificar se há qualquer filtro ativo (incluindo busca rápida)
   const hasAnyFilter = Boolean(
-    filters.nome_razao_social ||
+    getSearchValue().trim() ||
     hasActiveFilters
   )
 
@@ -151,12 +279,28 @@ export default function KanbanAgente() {
 
   // Busca modelos
   useEffect(() => {
-    api.get('/kanban-modelos').then((res) => setModelos(res.data))
+    api.get('/kanban-modelos')
+      .then((res) => setModelos(res.data))
+      .catch((error) => {
+        console.error('Erro ao carregar modelos:', error)
+        // Não precisa mostrar toast aqui, o interceptor já faz isso
+        setModelos([])
+      })
   }, [])
 
-  // Busca boards
-  const { data: boards = [], isLoading: boardsLoading } = useQuery<BoardWithLeadsCount[]>({
-    queryKey: ['kanban-boards-agente', selectedAgenteId],
+  // Limpa modelo selecionado se não for compatível com o tipoFluxo atual
+  useEffect(() => {
+    if (formData.kanban_modelo_id && modelos.length > 0) {
+      const modeloSelecionado = modelos.find(m => m.kanban_modelo_id === formData.kanban_modelo_id)
+      if (modeloSelecionado && modeloSelecionado.tipo_fluxo !== tipoFluxo) {
+        setFormData(prev => ({ ...prev, kanban_modelo_id: undefined }))
+      }
+    }
+  }, [tipoFluxo, modelos, formData.kanban_modelo_id])
+
+  // Busca todos os boards (sem filtro tipo_fluxo) para determinar tipos disponíveis
+  const { data: allBoards = [] } = useQuery<BoardWithLeadsCount[]>({
+    queryKey: ['kanban-boards-agente-all', selectedAgenteId],
     queryFn: async () => {
       const params = user?.perfil === 'ADMIN' && selectedAgenteId 
         ? `?agente_id=${selectedAgenteId}` 
@@ -165,6 +309,71 @@ export default function KanbanAgente() {
       return response.data
     },
     enabled: user?.perfil === 'AGENTE' || (user?.perfil === 'ADMIN' && !!selectedAgenteId),
+  })
+
+  // Determina tipos disponíveis baseado nos boards
+  useEffect(() => {
+    if (allBoards.length > 0 && modelos.length > 0) {
+      const tipos: ('COMPRADOR' | 'VENDEDOR')[] = []
+      
+      // Verifica cada board para determinar seu tipo_fluxo
+      allBoards.forEach(board => {
+        let boardTipoFluxo: 'COMPRADOR' | 'VENDEDOR' | null = board.tipo_fluxo as 'COMPRADOR' | 'VENDEDOR' | null
+        
+        // Se não tiver tipo_fluxo no board, busca do modelo
+        if (!boardTipoFluxo && board.kanban_modelo_id) {
+          const modelo = modelos.find(m => m.kanban_modelo_id === board.kanban_modelo_id)
+          if (modelo?.tipo_fluxo) {
+            boardTipoFluxo = modelo.tipo_fluxo
+          }
+        }
+        
+        if (boardTipoFluxo === 'COMPRADOR' && !tipos.includes('COMPRADOR')) {
+          tipos.push('COMPRADOR')
+        } else if (boardTipoFluxo === 'VENDEDOR' && !tipos.includes('VENDEDOR')) {
+          tipos.push('VENDEDOR')
+        }
+      })
+      
+      // Ordena: COMPRADOR primeiro, depois VENDEDOR
+      const sortedTipos: ('COMPRADOR' | 'VENDEDOR')[] = []
+      if (tipos.includes('COMPRADOR')) sortedTipos.push('COMPRADOR')
+      if (tipos.includes('VENDEDOR')) sortedTipos.push('VENDEDOR')
+      
+      setAvailableTypes(sortedTipos)
+      
+      // Define default do tipoFluxo se não estiver definido ou se o tipo atual não estiver disponível
+      if (sortedTipos.length > 0) {
+        if (!tipoFluxo || !sortedTipos.includes(tipoFluxo)) {
+          // Default: COMPRADOR se disponível, senão o primeiro disponível
+          const defaultTipo = sortedTipos.includes('COMPRADOR') ? 'COMPRADOR' : sortedTipos[0]
+          setTipoFluxo(defaultTipo)
+        }
+      } else {
+        setTipoFluxo(null)
+      }
+    } else if (allBoards.length === 0) {
+      // Se não houver boards, limpa tipos disponíveis
+      setAvailableTypes([])
+      setTipoFluxo(null)
+    }
+  }, [allBoards, modelos])
+
+  // Busca boards filtrados por tipo_fluxo
+  const { data: boards = [], isLoading: boardsLoading } = useQuery<BoardWithLeadsCount[]>({
+    queryKey: ['kanban-boards-agente', selectedAgenteId, tipoFluxo],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (user?.perfil === 'ADMIN' && selectedAgenteId) {
+        params.append('agente_id', selectedAgenteId)
+      }
+      if (tipoFluxo) {
+        params.append('tipo_fluxo', tipoFluxo)
+      }
+      const response = await api.get(`/kanban-boards/agente?${params.toString()}`)
+      return response.data
+    },
+    enabled: (user?.perfil === 'AGENTE' || (user?.perfil === 'ADMIN' && !!selectedAgenteId)) && !!tipoFluxo,
   })
 
   // Busca leads de todos os boards automaticamente
@@ -178,6 +387,12 @@ export default function KanbanAgente() {
         params.append('limit', '50')
         if (filters.nome_razao_social) {
           params.append('nome_razao_social', filters.nome_razao_social)
+        }
+        if (filters.email) {
+          params.append('email', filters.email)
+        }
+        if (filters.telefone) {
+          params.append('telefone', filters.telefone)
         }
         if (filters.uf) {
           params.append('uf', filters.uf)
@@ -315,16 +530,6 @@ export default function KanbanAgente() {
     },
   })
 
-  const deleteBoardMutation = useMutation({
-    mutationFn: async (boardId: number) => {
-      return api.delete(`/kanban-boards/${boardId}`)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['kanban-boards-agente'] })
-      queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
-    },
-  })
-
   const handleDragStart = (e: React.DragEvent, lead: Lead, boardId: number) => {
     setDraggedLead(lead)
     setDraggedFromBoardId(boardId)
@@ -376,18 +581,8 @@ export default function KanbanAgente() {
     createBoardMutation.mutate({
       ...formData,
       agente_id: agenteId,
+      tipo_fluxo: tipoFluxo || undefined,
     })
-  }
-
-  const handleDeleteBoard = async (boardId: number) => {
-    if (!confirm('Tem certeza que deseja excluir este board?')) return
-    try {
-      await deleteBoardMutation.mutateAsync(boardId)
-      toast.success('Board excluído com sucesso!')
-    } catch (error: any) {
-      // Erro já é tratado pelo interceptor do axios
-      console.error('Erro ao excluir board:', error)
-    }
   }
 
   const handleExibir = () => {
@@ -407,7 +602,63 @@ export default function KanbanAgente() {
   return (
     <div className="kanban-container">
       <div className="kanban-header">
-        <h1>Kanban</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <h1>Kanban</h1>
+          {/* Botões COMPRADOR/VENDEDOR */}
+          {/* Admin: mostra apenas se agente estiver selecionado e tipos disponíveis */}
+          {/* Agente: mostra se tipos disponíveis */}
+          {((user?.perfil === 'ADMIN' && selectedAgenteId && availableTypes.length > 0) ||
+            (user?.perfil === 'AGENTE' && availableTypes.length > 0)) && (
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              {availableTypes.includes('COMPRADOR') && (
+                <button
+                  onClick={() => {
+                    setTipoFluxo('COMPRADOR')
+                    setCurrentPage(1)
+                    queryClient.invalidateQueries({ queryKey: ['kanban-boards-agente'] })
+                    queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
+                  }}
+                  style={{
+                    backgroundColor: tipoFluxo === 'COMPRADOR' ? '#3498db' : 'white',
+                    color: tipoFluxo === 'COMPRADOR' ? 'white' : '#333',
+                    border: tipoFluxo === 'COMPRADOR' ? 'none' : '1px solid #ddd',
+                    borderRadius: '20px',
+                    padding: '8px 20px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: tipoFluxo === 'COMPRADOR' ? 'bold' : 'normal',
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  Comprador
+                </button>
+              )}
+              {availableTypes.includes('VENDEDOR') && (
+                <button
+                  onClick={() => {
+                    setTipoFluxo('VENDEDOR')
+                    setCurrentPage(1)
+                    queryClient.invalidateQueries({ queryKey: ['kanban-boards-agente'] })
+                    queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
+                  }}
+                  style={{
+                    backgroundColor: tipoFluxo === 'VENDEDOR' ? '#3498db' : 'white',
+                    color: tipoFluxo === 'VENDEDOR' ? 'white' : '#333',
+                    border: tipoFluxo === 'VENDEDOR' ? 'none' : '1px solid #ddd',
+                    borderRadius: '20px',
+                    padding: '8px 20px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: tipoFluxo === 'VENDEDOR' ? 'bold' : 'normal',
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  Vendedor
+                </button>
+              )}
+            </div>
+          )}
+        </div>
         <div className="kanban-header-actions">
           {user?.perfil === 'ADMIN' && (
             <select
@@ -423,13 +674,195 @@ export default function KanbanAgente() {
               ))}
             </select>
           )}
-          <input
-            type="text"
-            placeholder="Buscar por nome..."
-            className="kanban-search"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          {/* Botão Filtros */}
+          <button
+            onClick={() => setShowFiltersModal(true)}
+            className="btn-filters"
+            style={{ 
+              backgroundColor: hasActiveFilters ? '#3498db' : '#95a5a6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              whiteSpace: 'nowrap',
+              padding: '8px 16px',
+              position: 'relative'
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+            </svg>
+            <span className="btn-filters-text">Filtros</span>
+            {hasActiveFilters && (
+              <span style={{
+                position: 'absolute',
+                top: '-4px',
+                right: '-4px',
+                backgroundColor: '#ff6b35',
+                borderRadius: '50%',
+                width: '12px',
+                height: '12px',
+                border: '2px solid white'
+              }} />
+            )}
+          </button>
+          {/* Dropdown e Campo de busca rápida */}
+          <div data-search-dropdown style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            {/* Botão dropdown para selecionar tipo de busca */}
+            <button
+              type="button"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              style={{
+                backgroundColor: 'rgb(149, 165, 166)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px 0 0 4px',
+                cursor: 'pointer',
+                padding: '8px 12px',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                whiteSpace: 'nowrap',
+                borderRight: '1px solid rgb(149, 165, 166)'
+              }}
+            >
+              <span>{getSearchTypeLabel()}</span>
+              <svg 
+                width="12" 
+                height="12" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                style={{
+                  transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease'
+                }}
+              >
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            
+            {/* Dropdown menu */}
+            {isDropdownOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: '4px',
+                  backgroundColor: 'white',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  zIndex: 1000,
+                  minWidth: '120px'
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleSearchTypeChange('nome')}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    backgroundColor: searchType === 'nome' ? '#e3f2fd' : 'white',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (searchType !== 'nome') {
+                      e.currentTarget.style.backgroundColor = '#f5f5f5'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (searchType !== 'nome') {
+                      e.currentTarget.style.backgroundColor = 'white'
+                    }
+                  }}
+                >
+                  Nome
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSearchTypeChange('email')}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    borderTop: '1px solid #eee',
+                    backgroundColor: searchType === 'email' ? '#e3f2fd' : 'white',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (searchType !== 'email') {
+                      e.currentTarget.style.backgroundColor = '#f5f5f5'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (searchType !== 'email') {
+                      e.currentTarget.style.backgroundColor = 'white'
+                    }
+                  }}
+                >
+                  E-mail
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSearchTypeChange('telefone')}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    borderTop: '1px solid #eee',
+                    backgroundColor: searchType === 'telefone' ? '#e3f2fd' : 'white',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (searchType !== 'telefone') {
+                      e.currentTarget.style.backgroundColor = '#f5f5f5'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (searchType !== 'telefone') {
+                      e.currentTarget.style.backgroundColor = 'white'
+                    }
+                  }}
+                >
+                  Telefone
+                </button>
+              </div>
+            )}
+
+            {/* Campo de busca */}
+            <input
+              type="text"
+              placeholder={getPlaceholder()}
+              className="kanban-search"
+              value={getSearchValue()}
+              onChange={(e) => setSearchValue(e.target.value)}
+              style={{
+                borderTop: '1px solid rgb(149, 165, 166)',
+                borderRight: '1px solid rgb(149, 165, 166)',
+                borderBottom: '1px solid rgb(149, 165, 166)',
+                borderLeft: 'none',
+                borderRadius: '0 4px 4px 0',
+                height: '31px'
+              }}
+            />
+          </div>
           <button className="btn-exibir" onClick={handleExibir}>Exibir</button>
         </div>
       </div>
@@ -448,23 +881,23 @@ export default function KanbanAgente() {
                 style={{ backgroundColor: board.cor_hex }}
               >
                 <span className="board-name">{board.nome}</span>
-                <span className="board-count">
-                  {hasAnyFilter && boardLeads[board.id]?.total !== undefined
-                    ? `${boardLeads[board.id].total} de ${board.leads_count || 0}`
-                    : board.leads_count || 0}
-                </span>
-                {board.nome !== 'NOVOS' && board.leads_count === 0 && (
+                <div>
                   <button
-                    className="btn-delete-board"
+                    className="btn-add-lead"
                     onClick={(e) => {
                       e.stopPropagation()
-                      handleDeleteBoard(board.id)
+                      setSelectedBoardForNewLead(board.id)
                     }}
-                    title="Excluir board"
+                    title="Novo Lead"
                   >
-                    🗑️
+                    +
                   </button>
-                )}
+                  <span className="board-count">
+                    {hasAnyFilter && boardLeads[board.id]?.total !== undefined
+                      ? `${boardLeads[board.id].total} de ${board.leads_count || 0}`
+                      : board.leads_count || 0}
+                  </span>
+                </div>
               </div>
               <div
                 className="kanban-board-content"
@@ -687,11 +1120,13 @@ export default function KanbanAgente() {
                 onChange={(e) => setFormData({ ...formData, kanban_modelo_id: parseInt(e.target.value) })}
               >
                 <option value="">Selecione</option>
-                {modelos.map((modelo) => (
-                  <option key={modelo.kanban_modelo_id} value={modelo.kanban_modelo_id}>
-                    {modelo.descricao}
-                  </option>
-                ))}
+                {modelos
+                  .filter((modelo) => modelo.tipo_fluxo === tipoFluxo)
+                  .map((modelo) => (
+                    <option key={modelo.kanban_modelo_id} value={modelo.kanban_modelo_id}>
+                      {modelo.descricao}
+                    </option>
+                  ))}
               </select>
             </div>
             <div className="form-group">
@@ -761,7 +1196,6 @@ export default function KanbanAgente() {
         }}
         onClear={() => {
           setFilters({})
-          setSearchTerm('')
           setCurrentPage(1)
           queryClient.invalidateQueries({ queryKey: ['kanban-board-leads-all-agente'] })
         }}
@@ -770,6 +1204,24 @@ export default function KanbanAgente() {
         isAdmin={user?.perfil === 'ADMIN'}
         isAgente={user?.perfil === 'AGENTE'}
       />
+
+      {/* Modal de Criação de Lead */}
+      {selectedBoardForNewLead && (
+        <div className="modal-overlay" onClick={() => setSelectedBoardForNewLead(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%' }}>
+            <CreateLeadInBoardModal
+              boardId={selectedBoardForNewLead}
+              onClose={() => setSelectedBoardForNewLead(null)}
+              onSuccess={() => {
+                setSelectedBoardForNewLead(null)
+                setCurrentPage(1)
+                queryClient.invalidateQueries({ queryKey: ['kanban-board-leads-all-agente'] })
+              }}
+              invalidateQueries={['kanban-board-leads-all-agente']}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

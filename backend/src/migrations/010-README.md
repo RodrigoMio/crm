@@ -146,3 +146,6 @@ Esta migration consolida e substitui as seguintes migrations anteriores:
 
 **Nota:** Se você já executou essas migrations, não precisa executar esta. Esta é útil apenas para criar o banco do zero ou para referência.
 
+
+
+

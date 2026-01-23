@@ -11,6 +11,7 @@ export interface KanbanModeloWithStatuses {
   kanban_modelo_id: number;
   descricao: string;
   active: boolean;
+  tipo_fluxo: 'COMPRADOR' | 'VENDEDOR' | null;
   statuses: {
     kanban_status_id: number;
     descricao: string;
@@ -65,6 +66,7 @@ export class KanbanModelosService {
           kanban_modelo_id: modelo.kanban_modelo_id,
           descricao: modelo.descricao,
           active: modelo.active,
+          tipo_fluxo: modelo.tipo_fluxo,
           statuses,
         };
       }),
@@ -106,6 +108,7 @@ export class KanbanModelosService {
       kanban_modelo_id: modelo.kanban_modelo_id,
       descricao: modelo.descricao,
       active: modelo.active,
+      tipo_fluxo: modelo.tipo_fluxo,
       statuses,
     };
   }
@@ -154,6 +157,9 @@ export class KanbanModelosService {
     await this.kanbanModeloRepository.save(modelo);
   }
 }
+
+
+
 
 
 

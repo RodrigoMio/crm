@@ -9,6 +9,14 @@ export class FilterLeadsDto {
 
   @IsOptional()
   @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  telefone?: string;
+
+  @IsOptional()
+  @IsString()
   uf?: string;
 
   @IsOptional()
@@ -30,6 +38,10 @@ export class FilterLeadsDto {
   @Type(() => Number)
   @IsInt({ each: true })
   produtos?: number[];
+
+  @IsOptional()
+  @IsString()
+  tipo_lead?: string;
 
   @IsOptional()
   @Type(() => Number)

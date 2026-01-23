@@ -21,12 +21,36 @@ export default function EditLeadModal({
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const [whatsappNumbers, setWhatsappNumbers] = useState<string[]>([])
+  const [kanbanStatusChecks, setKanbanStatusChecks] = useState<{ comprador: boolean; vendedor: boolean }>({
+    comprador: false,
+    vendedor: false,
+  })
+  const [tipoLeadErrors, setTipoLeadErrors] = useState<{ comprador?: string; vendedor?: string }>({})
 
   // Busca o lead completo com produtos quando o modal abre
   const { data: fullLead } = useQuery<Lead>({
     queryKey: ['lead', lead.id],
     queryFn: async () => {
       const response = await api.get(`/leads/${lead.id}`)
+      return response.data
+    },
+    enabled: !!lead.id,
+  })
+
+  // Verifica status de kanban para COMPRADOR e VENDEDOR
+  const { data: kanbanStatusComprador } = useQuery<{ hasStatus: boolean }>({
+    queryKey: ['lead-kanban-status', lead.id, 'COMPRADOR'],
+    queryFn: async () => {
+      const response = await api.get(`/leads/${lead.id}/kanban-status/COMPRADOR`)
+      return response.data
+    },
+    enabled: !!lead.id,
+  })
+
+  const { data: kanbanStatusVendedor } = useQuery<{ hasStatus: boolean }>({
+    queryKey: ['lead-kanban-status', lead.id, 'VENDEDOR'],
+    queryFn: async () => {
+      const response = await api.get(`/leads/${lead.id}/kanban-status/VENDEDOR`)
       return response.data
     },
     enabled: !!lead.id,
@@ -48,6 +72,7 @@ export default function EditLeadModal({
     vendedor_id: leadWithProducts.vendedor_id,
     usuario_id_colaborador: leadWithProducts.usuario_id_colaborador,
     produtos: leadWithProducts.produtos?.map(p => p.produto_id) || [],
+    tipo_lead: leadWithProducts.tipo_lead || [],
   })
 
   // Atualiza formData quando o lead completo é carregado
@@ -68,9 +93,18 @@ export default function EditLeadModal({
         vendedor_id: leadWithProducts.vendedor_id,
         usuario_id_colaborador: leadWithProducts.usuario_id_colaborador,
         produtos: produtosIds,
+        tipo_lead: leadWithProducts.tipo_lead || [],
       })
     }
   }, [leadWithProducts])
+
+  // Atualiza status de kanban quando os dados são carregados
+  useEffect(() => {
+    setKanbanStatusChecks({
+      comprador: kanbanStatusComprador?.hasStatus || false,
+      vendedor: kanbanStatusVendedor?.hasStatus || false,
+    })
+  }, [kanbanStatusComprador, kanbanStatusVendedor])
 
   // Função para extrair e validar números de telefone
   const extractValidPhoneNumbers = (phoneString: string | undefined): string[] => {
@@ -173,6 +207,14 @@ export default function EditLeadModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
+    // Validação: pelo menos um tipo de lead deve estar selecionado
+    if (!formData.tipo_lead || formData.tipo_lead.length === 0) {
+      setTipoLeadErrors({ comprador: 'Selecione pelo menos uma opção' })
+      return
+    }
+    
+    setTipoLeadErrors({})
+    
     // Remove vendedor_id e usuario_id_colaborador do payload (campos readonly)
     const dataToSend: any = { ...formData }
     delete dataToSend.vendedor_id
@@ -181,43 +223,55 @@ export default function EditLeadModal({
     mutation.mutate(dataToSend)
   }
 
+  const handleTipoLeadChange = (tipo: 'COMPRADOR' | 'VENDEDOR', checked: boolean) => {
+    // Verifica se pode desmarcar
+    if (!checked) {
+      if (tipo === 'COMPRADOR' && kanbanStatusChecks.comprador) {
+        setTipoLeadErrors({
+          ...tipoLeadErrors,
+          comprador: 'Lead ativo como VENDEDOR. Não é possível desmarcar',
+        })
+        return
+      }
+      if (tipo === 'VENDEDOR' && kanbanStatusChecks.vendedor) {
+        setTipoLeadErrors({
+          ...tipoLeadErrors,
+          vendedor: 'Lead ativo como VENDEDOR. Não é possível desmarcar',
+        })
+        return
+      }
+    }
+
+    const currentTipos = formData.tipo_lead || []
+    let newTipos: string[]
+    
+    if (checked) {
+      newTipos = [...currentTipos, tipo]
+    } else {
+      newTipos = currentTipos.filter(t => t !== tipo)
+    }
+    
+    setFormData({ ...formData, tipo_lead: newTipos })
+    setTipoLeadErrors({})
+  }
+
 
   return (
     <div>
       <h2>Editar Lead</h2>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <div>
-            <label>Data de Entrada *</label>
-            <input
-              type="date"
-              value={formData.data_entrada || new Date().toISOString().split('T')[0]}
-              onChange={(e) => setFormData({ ...formData, data_entrada: e.target.value })}
-              required
-              style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
-            />
-          </div>
-
-          <div>
-            <label>Vendedor</label>
-            <input
-              type="text"
-              value={leadWithProducts.vendedor?.nome || ''}
-              readOnly
-              style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem', backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
-            />
-          </div>
-        </div>
-
         <div>
-          <label>Colaborador</label>
+          <label>Data de Entrada *</label>
           <input
-            type="text"
-            value={leadWithProducts.colaborador?.nome || 'Nenhum'}
-            readOnly
-            style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem', backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+            type="date"
+            value={formData.data_entrada || new Date().toISOString().split('T')[0]}
+            onChange={(e) => setFormData({ ...formData, data_entrada: e.target.value })}
+            required
+            style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
           />
         </div>
+
+        {/* Campos Vendedor e Colaborador ocultos */}
 
         <div>
           <label>Nome/Razão Social *</label>
@@ -317,6 +371,75 @@ export default function EditLeadModal({
               style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
             />
           </div>
+        </div>
+
+        <div>
+          <label>Tipo de Lead *</label>
+          <div style={{ display: 'flex', flexDirection: 'row', gap: '1.5rem', marginTop: '0.25rem', alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: kanbanStatusChecks.comprador ? 'not-allowed' : 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={formData.tipo_lead?.includes('COMPRADOR') || false}
+                onChange={(e) => handleTipoLeadChange('COMPRADOR', e.target.checked)}
+                disabled={kanbanStatusChecks.comprador}
+                style={{ 
+                  width: '18px', 
+                  height: '18px', 
+                  minWidth: '18px', 
+                  minHeight: '18px',
+                  cursor: kanbanStatusChecks.comprador ? 'not-allowed' : 'pointer', 
+                  margin: 0,
+                  marginRight: '8px',
+                  flexShrink: 0
+                }}
+              />
+              <span>COMPRADOR</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: kanbanStatusChecks.vendedor ? 'not-allowed' : 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={formData.tipo_lead?.includes('VENDEDOR') || false}
+                onChange={(e) => handleTipoLeadChange('VENDEDOR', e.target.checked)}
+                disabled={kanbanStatusChecks.vendedor}
+                style={{ 
+                  width: '18px', 
+                  height: '18px', 
+                  minWidth: '18px', 
+                  minHeight: '18px',
+                  cursor: kanbanStatusChecks.vendedor ? 'not-allowed' : 'pointer', 
+                  margin: 0,
+                  marginRight: '8px',
+                  flexShrink: 0
+                }}
+              />
+              <span>VENDEDOR</span>
+            </label>
+          </div>
+          {kanbanStatusChecks.comprador && (
+            <small style={{ color: '#ff9800', marginTop: '0.25rem', display: 'block' }}>
+              Lead ativo como VENDEDOR. Não é possível desmarcar
+            </small>
+          )}
+          {kanbanStatusChecks.vendedor && (
+            <small style={{ color: '#ff9800', marginTop: '0.25rem', display: 'block' }}>
+              Lead ativo como VENDEDOR. Não é possível desmarcar
+            </small>
+          )}
+          {tipoLeadErrors.comprador && !kanbanStatusChecks.comprador && (
+            <small style={{ color: '#d32f2f', marginTop: '0.25rem', display: 'block' }}>
+              {tipoLeadErrors.comprador}
+            </small>
+          )}
+          {tipoLeadErrors.vendedor && !kanbanStatusChecks.vendedor && (
+            <small style={{ color: '#d32f2f', marginTop: '0.25rem', display: 'block' }}>
+              {tipoLeadErrors.vendedor}
+            </small>
+          )}
+          {tipoLeadErrors.comprador && tipoLeadErrors.comprador.includes('Selecione') && (
+            <small style={{ color: '#d32f2f', marginTop: '0.25rem', display: 'block' }}>
+              {tipoLeadErrors.comprador}
+            </small>
+          )}
         </div>
 
         <div>

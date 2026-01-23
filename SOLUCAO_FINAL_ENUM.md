@@ -163,3 +163,6 @@ WHERE table_name = 'leads' AND column_name = 'usuario_id_colaborador';
 
 
 
+
+
+

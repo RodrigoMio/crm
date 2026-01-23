@@ -284,3 +284,6 @@ onSuccess: async () => {
 
 **Solução rápida:** Implementar Soluções 1, 2 e 3 primeiro, pois são as que têm maior impacto.
 
+
+
+

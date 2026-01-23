@@ -241,3 +241,6 @@ tail -f /var/log/httpd/access_log
 **Pronto!** 🎉 Siga a ordem recomendada e você conseguirá configurar o proxy reverso.
 
 
+
+
+

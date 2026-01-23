@@ -43,7 +43,14 @@ export class Occurrence {
   })
   tipo: OccurrenceType;
 
+  @Column({
+    type: 'enum',
+    enum: ['COMPRADOR', 'VENDEDOR'],
+    nullable: true,
+    name: 'tipo_fluxo'
+  })
+  tipo_fluxo: 'COMPRADOR' | 'VENDEDOR' | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   created_at: Date;
 }
-

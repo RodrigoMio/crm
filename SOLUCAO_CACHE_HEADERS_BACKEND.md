@@ -65,3 +65,6 @@ app.use((req, res, next) => {
 
 Esta é uma correção **CRÍTICA** que deve ser implementada junto com as correções do frontend. Sem isso, mesmo que o frontend esteja correto, o navegador/proxy podem estar servindo dados em cache.
 
+
+
+

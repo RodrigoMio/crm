@@ -266,3 +266,6 @@ Se o `.htaccess` não está sendo lido, você precisa:
 **Pronto!** 🎉 Após seguir estes passos, o frontend usará o proxy reverso corretamente.
 
 
+
+
+

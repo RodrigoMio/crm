@@ -38,5 +38,8 @@ export class CreateKanbanBoardDto {
   @IsOptional()
   @IsInt({ message: 'ordem deve ser um número inteiro' })
   ordem?: number;
-}
 
+  @IsOptional()
+  @IsString()
+  tipo_fluxo?: 'COMPRADOR' | 'VENDEDOR';
+}

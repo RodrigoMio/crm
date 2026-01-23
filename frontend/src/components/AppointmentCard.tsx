@@ -8,6 +8,7 @@ interface AppointmentCardProps {
   onEdit?: (lead: Lead) => void
   onOccurrences?: (lead: Lead) => void
   onSchedule?: (lead: Lead) => void
+  onConfirm?: (appointment: Appointment) => void
   draggable?: boolean
   onDragStart?: (e: React.DragEvent, appointment: Appointment) => void
   onDragEnd?: (e: React.DragEvent) => void
@@ -57,6 +58,7 @@ export default function AppointmentCard({
   onEdit,
   onOccurrences,
   onSchedule,
+  onConfirm,
   draggable = false,
   onDragStart,
   onDragEnd,
@@ -92,7 +94,13 @@ export default function AppointmentCard({
           onDragEnd(e)
         }
       }}
-      onClick={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation()
+        // Se for SCHEDULED e tiver onConfirm, abre modal ao clicar no card
+        if (isScheduled && onConfirm) {
+          onConfirm(appointment)
+        }
+      }}
     >
       <div className="appointment-card-header">
         <div className="appointment-card-icon">
@@ -151,7 +159,19 @@ export default function AppointmentCard({
                     setOpenMenu(false)
                   }}
                 >
-                  Agendar contato
+                  {isScheduled ? 'Reagendar' : 'Agendar contato'}
+                </button>
+              )}
+              {onConfirm && isScheduled && (
+                <button
+                  className="appointment-card-menu-item"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onConfirm(appointment)
+                    setOpenMenu(false)
+                  }}
+                >
+                  Confirmar contato
                 </button>
               )}
             </div>

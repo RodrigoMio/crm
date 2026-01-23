@@ -5,9 +5,11 @@ import { Appointment, AppointmentStatus } from './entities/appointment.entity';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
 import { FilterAppointmentsDto } from './dto/filter-appointments.dto';
+import { CompleteAppointmentDto } from './dto/complete-appointment.dto';
 import { Lead } from '../leads/entities/lead.entity';
 import { User, UserProfile } from '../users/entities/user.entity';
 import { LeadsService } from '../leads/leads.service';
+import { Occurrence, OccurrenceType } from '../occurrences/entities/occurrence.entity';
 
 @Injectable()
 export class AppointmentsService {
@@ -16,6 +18,8 @@ export class AppointmentsService {
     private appointmentsRepository: Repository<Appointment>,
     @InjectRepository(Lead)
     private leadsRepository: Repository<Lead>,
+    @InjectRepository(Occurrence)
+    private occurrencesRepository: Repository<Occurrence>,
     private leadsService: LeadsService,
   ) {}
 
@@ -209,8 +213,9 @@ export class AppointmentsService {
 
   /**
    * Marca agendamento como realizado
+   * Se observações forem fornecidas, cria uma ocorrência do tipo USUARIO
    */
-  async complete(id: number, currentUser: User): Promise<Appointment> {
+  async complete(id: number, completeDto: CompleteAppointmentDto, currentUser: User): Promise<Appointment> {
     const appointment = await this.findOne(id, currentUser);
 
     if (appointment.status !== AppointmentStatus.SCHEDULED) {
@@ -218,7 +223,21 @@ export class AppointmentsService {
     }
 
     appointment.status = AppointmentStatus.COMPLETED;
-    return await this.appointmentsRepository.save(appointment);
+    const savedAppointment = await this.appointmentsRepository.save(appointment);
+
+    // Se houver observações, cria uma ocorrência do tipo USUARIO
+    if (completeDto.observacoes && completeDto.observacoes.trim()) {
+      const userId = this.normalizeId(currentUser.id);
+      const occurrence = this.occurrencesRepository.create({
+        leads_id: appointment.lead_id,
+        usuarios_id: userId,
+        texto: completeDto.observacoes.trim(),
+        tipo: OccurrenceType.USUARIO,
+      });
+      await this.occurrencesRepository.save(occurrence);
+    }
+
+    return savedAppointment;
   }
 
   /**

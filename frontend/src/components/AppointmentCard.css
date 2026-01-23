@@ -11,6 +11,7 @@
 
 .appointment-card.draggable {
   cursor: grab;
+  border: 2px solid #98c0ff;
 }
 
 .appointment-card.draggable:active {
@@ -38,7 +39,7 @@
 
 .appointment-card-name {
   flex: 1;
-  font-weight: 600;
+  font-weight: 800;
   color: #333;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -47,7 +48,7 @@
 
 .appointment-card-agente {
   font-weight: 500;
-  color: #666;
+  color: #000;
   font-size: 0.9em;
 }
 
@@ -134,8 +135,9 @@
   display: inline-block;
   padding: 0.125rem 0.5rem;
   border-radius: 12px;
-  font-size: 10px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 700;
+  border-bottom: 1px solid #3d3d3d;
 }
 
 .appointment-card-observations {
@@ -146,5 +148,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+  font-weight: 600;
+  background-color: #fff;
+  padding: 0px 5px;
+  border-radius: 5px;
 }
 

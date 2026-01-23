@@ -9,6 +9,7 @@ interface WeekViewProps {
   onEdit?: (lead: Lead) => void
   onOccurrences?: (lead: Lead) => void
   onSchedule?: (lead: Lead) => void
+  onConfirm?: (appointment: Appointment) => void
   onDragStart?: (e: React.DragEvent, appointment: Appointment) => void
   onDragEnd?: (e: React.DragEvent) => void
   onDrop?: (e: React.DragEvent, date: Date) => void
@@ -28,6 +29,7 @@ export default function WeekView({
   onEdit,
   onOccurrences,
   onSchedule,
+  onConfirm,
   onDragStart,
   onDragEnd,
   onDrop,
@@ -143,6 +145,7 @@ export default function WeekView({
                     onEdit={onEdit}
                     onOccurrences={onOccurrences}
                     onSchedule={onSchedule}
+                    onConfirm={onConfirm}
                     draggable={appointment.status === 'SCHEDULED'}
                     onDragStart={onDragStart}
                     onDragEnd={onDragEnd}

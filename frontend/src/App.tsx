@@ -36,6 +36,16 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function AdminOrAgenteRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
+
+  if (user?.perfil !== 'ADMIN' && user?.perfil !== 'AGENTE') {
+    return <Navigate to="/leads" replace />
+  }
+
+  return <>{children}</>
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -78,7 +88,11 @@ function AppRoutes() {
         />
         <Route
           path="kanban-agente"
-          element={<KanbanAgente />}
+          element={
+            <AdminOrAgenteRoute>
+              <KanbanAgente />
+            </AdminOrAgenteRoute>
+          }
         />
         <Route
           path="kanban-colaborador"

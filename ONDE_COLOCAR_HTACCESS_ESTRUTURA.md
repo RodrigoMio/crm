@@ -204,3 +204,6 @@ Se você preferir **não copiar arquivos** e manter tudo em `/apps_nodejs/crm/fr
 **Pronto!** 🎉 Verifique onde o Apache serve e coloque o `.htaccess` lá.
 
 
+
+
+

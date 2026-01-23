@@ -7,6 +7,7 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  OneToMany,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { KanbanStatus } from '../../kanban-modelos/entities/kanban-status.entity';
@@ -114,13 +115,17 @@ export class Lead {
   @Column({ type: 'integer', nullable: true, name: 'total_conversoes' })
   total_conversoes: number;
 
+  // Tipo de lead (array): COMPRADOR, VENDEDOR, ou ambos
+  @Column({ type: 'varchar', array: true, nullable: true, name: 'tipo_lead' })
+  tipo_lead: string[];
+
+  // Relação com lead_kanban_status (se a entidade existir)
+  // @OneToMany(() => LeadKanbanStatus, (lks) => lks.lead)
+  // kanbanStatuses: LeadKanbanStatus[];
+
   @CreateDateColumn()
   created_at: Date;
 
   @UpdateDateColumn()
   updated_at: Date;
 }
-
-
-
-

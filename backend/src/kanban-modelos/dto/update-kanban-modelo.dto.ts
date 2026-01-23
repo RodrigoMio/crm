@@ -7,3 +7,6 @@ export class UpdateKanbanModeloDto extends PartialType(CreateKanbanModeloDto) {}
 
 
 
+
+
+

@@ -23,6 +23,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UserProfile } from '../users/entities/user.entity';
 import { KanbanBoardType } from './entities/kanban-board.entity';
 import { FilterLeadsDto } from '../leads/dto/filter-leads.dto';
+import { CreateLeadDto } from '../leads/dto/create-lead.dto';
 
 @Controller('kanban-boards')
 @UseGuards(JwtAuthGuard)
@@ -39,12 +40,6 @@ export class KanbanBoardsController {
       throw new ForbiddenException('Apenas administradores podem acessar Kanban Admin');
     }
 
-    // Garante que board "Novos" existe
-    await this.kanbanBoardsService.ensureNovosBoard(
-      KanbanBoardType.ADMIN,
-      req.user,
-    );
-
     return this.kanbanBoardsService.findAll(
       { ...filterDto, tipo: KanbanBoardType.ADMIN },
       req.user,
@@ -59,6 +54,7 @@ export class KanbanBoardsController {
   async findAllAgente(
     @Request() req,
     @Query('agente_id') agenteId?: string,
+    @Query('tipo_fluxo') tipoFluxo?: 'COMPRADOR' | 'VENDEDOR',
   ) {
     // Admin ou Agente podem acessar
     if (
@@ -82,17 +78,11 @@ export class KanbanBoardsController {
         : req.user.id;
     }
 
-    // Garante que board "Novos" existe
-    await this.kanbanBoardsService.ensureNovosBoard(
-      KanbanBoardType.AGENTE,
-      req.user,
-      agenteIdNumber,
-    );
-
     return this.kanbanBoardsService.findAll(
       {
         tipo: KanbanBoardType.AGENTE,
         agente_id: agenteIdNumber,
+        tipo_fluxo: tipoFluxo,
       },
       req.user,
     );
@@ -107,6 +97,7 @@ export class KanbanBoardsController {
     @Request() req,
     @Query('agente_id') agenteId?: string,
     @Query('colaborador_id') colaboradorId?: string,
+    @Query('tipo_fluxo') tipoFluxo?: 'COMPRADOR' | 'VENDEDOR',
   ) {
     // Admin, Agente ou Colaborador podem acessar
     if (
@@ -133,18 +124,11 @@ export class KanbanBoardsController {
       colaboradorIdNumber = parseInt(colaboradorId, 10);
     }
 
-    // Garante que board "Novos" existe
-    await this.kanbanBoardsService.ensureNovosBoard(
-      KanbanBoardType.COLABORADOR,
-      req.user,
-      undefined,
-      colaboradorIdNumber,
-    );
-
     return this.kanbanBoardsService.findAll(
       {
         tipo: KanbanBoardType.COLABORADOR,
         colaborador_id: colaboradorIdNumber,
+        tipo_fluxo: tipoFluxo,
       },
       req.user,
     );
@@ -170,6 +154,8 @@ export class KanbanBoardsController {
     // Transforma produtos de string/array para number[]
     const filterDto: FilterLeadsDto = {
       nome_razao_social: query.nome_razao_social || query.nome, // Aceita ambos para compatibilidade
+      email: query.email,
+      telefone: query.telefone,
       uf: query.uf,
       vendedor_id: query.vendedor_id ? parseInt(query.vendedor_id, 10) : undefined,
       usuario_id_colaborador: query.usuario_id_colaborador ? parseInt(query.usuario_id_colaborador, 10) : undefined,
@@ -195,6 +181,18 @@ export class KanbanBoardsController {
   @Post()
   create(@Body() createKanbanBoardDto: CreateKanbanBoardDto, @Request() req) {
     return this.kanbanBoardsService.create(createKanbanBoardDto, req.user);
+  }
+
+  /**
+   * Cria um lead e associa diretamente a um board
+   */
+  @Post(':boardId/leads')
+  createLeadInBoard(
+    @Param('boardId', ParseIntPipe) boardId: number,
+    @Body() createLeadDto: CreateLeadDto,
+    @Request() req,
+  ) {
+    return this.kanbanBoardsService.createLeadInBoard(boardId, createLeadDto, req.user);
   }
 
   /**

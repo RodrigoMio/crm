@@ -15,6 +15,7 @@ import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
 import { FilterAppointmentsDto } from './dto/filter-appointments.dto';
 import { MoveAppointmentDto } from './dto/move-appointment.dto';
+import { CompleteAppointmentDto } from './dto/complete-appointment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('leads/:leadId/appointments')
@@ -88,8 +89,12 @@ export class AppointmentsControllerById {
    * Marca agendamento como realizado
    */
   @Patch(':id/complete')
-  complete(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.appointmentsService.complete(id, req.user);
+  complete(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() completeDto: CompleteAppointmentDto,
+    @Request() req,
+  ) {
+    return this.appointmentsService.complete(id, completeDto, req.user);
   }
 
   /**

@@ -224,6 +224,27 @@ export class LeadsService {
       );
     }
 
+    // Filtro por email (busca parcial, case-insensitive)
+    if (filterDto.email) {
+      queryBuilder.andWhere(
+        'LOWER(lead.email) ILIKE LOWER(:email)',
+        { email: `%${filterDto.email.trim()}%` }
+      );
+    }
+
+    // Filtro por telefone (busca parcial, apenas números)
+    // Remove formatação (parênteses, traços, espaços) e busca apenas pelos números
+    if (filterDto.telefone) {
+      const telefoneNumeros = filterDto.telefone.trim().replace(/\D/g, ''); // Remove tudo que não é número
+      if (telefoneNumeros) {
+        // Remove formatação do telefone no banco e compara apenas números
+        queryBuilder.andWhere(
+          `REGEXP_REPLACE(lead.telefone, '[^0-9]', '', 'g') ILIKE :telefone`,
+          { telefone: `%${telefoneNumeros}%` }
+        );
+      }
+    }
+
     // Filtro por UF
     if (filterDto.uf) {
       queryBuilder.andWhere('lead.uf = :uf', { uf: filterDto.uf });
@@ -283,6 +304,11 @@ export class LeadsService {
           produtoIds: filterDto.produtos,
         }
       );
+    }
+
+    // Filtro por tipo_lead (verifica se o array contém o valor)
+    if (filterDto.tipo_lead) {
+      queryBuilder.andWhere(':tipoLead = ANY(lead.tipo_lead)', { tipoLead: filterDto.tipo_lead });
     }
 
     queryBuilder.orderBy('lead.created_at', 'DESC');
@@ -529,6 +555,30 @@ export class LeadsService {
     }
 
     await this.leadsRepository.remove(lead);
+  }
+
+  /**
+   * Verifica se o lead tem registro em lead_kanban_status para um tipo_fluxo específico
+   */
+  async checkKanbanStatus(id: number, tipoFluxo: string, currentUser: User): Promise<{ hasStatus: boolean }> {
+    // Verifica permissão de acesso ao lead
+    await this.findOne(id, currentUser);
+
+    // Valida tipo_fluxo
+    if (tipoFluxo !== 'COMPRADOR' && tipoFluxo !== 'VENDEDOR') {
+      throw new BadRequestException('tipoFluxo deve ser COMPRADOR ou VENDEDOR');
+    }
+
+    // Verifica se existe registro em lead_kanban_status
+    const result = await this.dataSource.query(
+      `SELECT COUNT(*) as count FROM lead_kanban_status 
+       WHERE lead_id = $1 AND tipo_fluxo = $2`,
+      [id, tipoFluxo],
+    );
+
+    const hasStatus = parseInt(result[0]?.count || '0', 10) > 0;
+
+    return { hasStatus };
   }
 
   /**
