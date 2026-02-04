@@ -4,7 +4,7 @@ import { OccurrenceType } from '../entities/occurrence.entity';
 export class CreateOccurrenceDto {
   @IsString()
   @IsNotEmpty({ message: 'Texto da ocorrência é obrigatório' })
-  @MaxLength(255, { message: 'Texto da ocorrência não pode ter mais de 255 caracteres' })
+  @MaxLength(1000, { message: 'Texto da ocorrência não pode ter mais de 1000 caracteres' })
   texto: string;
 
   @IsOptional()

@@ -11,25 +11,28 @@ interface CreateLeadInBoardModalProps {
   onClose: () => void
   onSuccess?: () => void
   invalidateQueries?: string[]
+  tipoFluxo?: 'COMPRADOR' | 'VENDEDOR'
 }
 
 export default function CreateLeadInBoardModal({ 
   boardId, 
   onClose, 
   onSuccess,
-  invalidateQueries = []
+  invalidateQueries = [],
+  tipoFluxo
 }: CreateLeadInBoardModalProps) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const [tipoLeadErrors, setTipoLeadErrors] = useState<{ comprador?: string; vendedor?: string }>({})
 
+  // Inicializa tipo_lead com o tipo_fluxo do board se fornecido
   const [formData, setFormData] = useState<CreateLeadDto>({
     nome_razao_social: '',
     uf: '',
     municipio: '',
     vendedor_id: user?.perfil === 'AGENTE' ? user.id : undefined,
     produtos: [],
-    tipo_lead: [],
+    tipo_lead: tipoFluxo ? [tipoFluxo] : [],
   })
 
   // Busca dados completos do usuário logado (para Colaborador obter agente pai)
@@ -139,6 +142,11 @@ export default function CreateLeadInBoardModal({
   }
 
   const handleTipoLeadChange = (tipo: 'COMPRADOR' | 'VENDEDOR', checked: boolean) => {
+    // Se o tipo corresponder ao tipoFluxo do board, não permite desmarcar
+    if (tipoFluxo && tipo === tipoFluxo && !checked) {
+      return
+    }
+    
     const currentTipos = formData.tipo_lead || []
     let newTipos: string[]
     
@@ -272,17 +280,19 @@ export default function CreateLeadInBoardModal({
           <div>
             <label>Tipo de Lead *</label>
             <div style={{ display: 'flex', flexDirection: 'row', gap: '1.5rem', marginTop: '0.5rem', alignItems: 'center' }}>
-              <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 'normal', userSelect: 'none' }}>
+              <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: tipoFluxo === 'COMPRADOR' ? 'not-allowed' : 'pointer', fontWeight: 'normal', userSelect: 'none' }}>
                 <input
                   type="checkbox"
                   checked={formData.tipo_lead?.includes('COMPRADOR') || false}
                   onChange={(e) => handleTipoLeadChange('COMPRADOR', e.target.checked)}
+                  disabled={tipoFluxo === 'COMPRADOR'}
+                  readOnly={tipoFluxo === 'COMPRADOR'}
                   style={{ 
                     width: '18px', 
                     height: '18px', 
                     minWidth: '18px', 
                     minHeight: '18px',
-                    cursor: 'pointer', 
+                    cursor: tipoFluxo === 'COMPRADOR' ? 'not-allowed' : 'pointer', 
                     margin: 0,
                     marginRight: '8px',
                     flexShrink: 0
@@ -290,17 +300,19 @@ export default function CreateLeadInBoardModal({
                 />
                 <span>COMPRADOR</span>
               </label>
-              <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 'normal', userSelect: 'none' }}>
+              <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: tipoFluxo === 'VENDEDOR' ? 'not-allowed' : 'pointer', fontWeight: 'normal', userSelect: 'none' }}>
                 <input
                   type="checkbox"
                   checked={formData.tipo_lead?.includes('VENDEDOR') || false}
                   onChange={(e) => handleTipoLeadChange('VENDEDOR', e.target.checked)}
+                  disabled={tipoFluxo === 'VENDEDOR'}
+                  readOnly={tipoFluxo === 'VENDEDOR'}
                   style={{ 
                     width: '18px', 
                     height: '18px', 
                     minWidth: '18px', 
                     minHeight: '18px',
-                    cursor: 'pointer', 
+                    cursor: tipoFluxo === 'VENDEDOR' ? 'not-allowed' : 'pointer', 
                     margin: 0,
                     marginRight: '8px',
                     flexShrink: 0
@@ -317,12 +329,13 @@ export default function CreateLeadInBoardModal({
           </div>
 
           <div>
-            <label>Produtos de interesse</label>
             <div style={{ marginTop: '0.25rem' }}>
               <ProductTagsInput
                 value={formData.produtos || []}
                 onChange={(produtos) => setFormData({ ...formData, produtos })}
                 isAdmin={user?.perfil === 'ADMIN'}
+                showViewAllButton={true}
+                label="Produtos de interesse"
               />
             </div>
           </div>

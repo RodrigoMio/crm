@@ -94,6 +94,75 @@
   opacity: 1;
 }
 
+.board-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Botão de adicionar lead - oculto por padrão, aparece no hover */
+.btn-add-lead {
+  background: transparent;
+  border: none;
+  color: #000000;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 18px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  transition: background-color 0.2s, opacity 0.2s;
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.kanban-board-header:hover .btn-add-lead {
+  opacity: 1;
+}
+
+.btn-add-lead:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Botão de exportar leads - oculto por padrão, aparece no hover */
+.btn-export-leads {
+  background: transparent;
+  border: none;
+  color: #000000;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  transition: background-color 0.2s, opacity 0.2s;
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.kanban-board-header:hover .btn-export-leads:not(:disabled) {
+  opacity: 1;
+}
+
+.kanban-board-header:hover .btn-export-leads:disabled {
+  opacity: 0;
+}
+
+.btn-export-leads:hover:not(:disabled) {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.btn-export-leads:disabled {
+  cursor: not-allowed;
+}
+
 .btn-delete-board {
   background: none;
   border: none;

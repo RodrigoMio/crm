@@ -12,7 +12,9 @@ import {
   Query,
   Put,
   ForbiddenException,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { KanbanBoardsService } from './kanban-boards.service';
 import { CreateKanbanBoardDto } from './dto/create-kanban-board.dto';
 import { UpdateKanbanBoardDto } from './dto/update-kanban-board.dto';
@@ -24,6 +26,7 @@ import { UserProfile } from '../users/entities/user.entity';
 import { KanbanBoardType } from './entities/kanban-board.entity';
 import { FilterLeadsDto } from '../leads/dto/filter-leads.dto';
 import { CreateLeadDto } from '../leads/dto/create-lead.dto';
+import { BulkAddProdutoDto, BulkRemoveProdutoDto } from './dto/bulk-produto.dto';
 
 @Controller('kanban-boards')
 @UseGuards(JwtAuthGuard)
@@ -152,11 +155,16 @@ export class KanbanBoardsController {
     @Query() query: any,
   ) {
     // Transforma produtos de string/array para number[]
+    // Transforma uf de string/array para string[]
     const filterDto: FilterLeadsDto = {
       nome_razao_social: query.nome_razao_social || query.nome, // Aceita ambos para compatibilidade
       email: query.email,
       telefone: query.telefone,
-      uf: query.uf,
+      uf: query.uf
+        ? Array.isArray(query.uf)
+          ? query.uf
+          : [query.uf]
+        : undefined,
       vendedor_id: query.vendedor_id ? parseInt(query.vendedor_id, 10) : undefined,
       usuario_id_colaborador: query.usuario_id_colaborador ? parseInt(query.usuario_id_colaborador, 10) : undefined,
       origem_lead: query.origem_lead,
@@ -173,6 +181,52 @@ export class KanbanBoardsController {
       filterDto,
       req.user,
     );
+  }
+
+  /**
+   * Exporta leads de um board para Excel
+   */
+  @Get(':id/leads/export')
+  async exportLeadsByBoard(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req,
+    @Query() query: any,
+    @Res() res: Response,
+  ) {
+    // Transforma produtos de string/array para number[]
+    // Transforma uf de string/array para string[]
+    const filterDto: FilterLeadsDto = {
+      nome_razao_social: query.nome_razao_social || query.nome,
+      email: query.email,
+      telefone: query.telefone,
+      uf: query.uf
+        ? Array.isArray(query.uf)
+          ? query.uf
+          : [query.uf]
+        : undefined,
+      vendedor_id: query.vendedor_id ? parseInt(query.vendedor_id, 10) : undefined,
+      usuario_id_colaborador: query.usuario_id_colaborador ? parseInt(query.usuario_id_colaborador, 10) : undefined,
+      origem_lead: query.origem_lead,
+      produtos: query.produtos 
+        ? Array.isArray(query.produtos) 
+          ? query.produtos.map((p: string) => parseInt(p, 10))
+          : [parseInt(query.produtos, 10)]
+        : undefined,
+    };
+
+    const board = await this.kanbanBoardsService.findOne(id);
+    const excelBuffer = await this.kanbanBoardsService.exportLeadsByBoard(
+      id,
+      filterDto,
+      req.user,
+    );
+
+    // Nome do arquivo: leads-{nome-do-board}.xlsx
+    const fileName = `leads-${board.nome.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(excelBuffer);
   }
 
   /**
@@ -241,6 +295,84 @@ export class KanbanBoardsController {
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number, @Request() req) {
     return this.kanbanBoardsService.remove(id, req.user);
+  }
+
+  /**
+   * Adiciona produto (tag) para todos os leads visíveis de um board
+   * POST /kanban-boards/:boardId/leads/bulk-add-produto
+   */
+  @Post(':boardId/leads/bulk-add-produto')
+  bulkAddProduto(
+    @Param('boardId', ParseIntPipe) boardId: number,
+    @Body() bulkAddProdutoDto: BulkAddProdutoDto,
+    @Request() req,
+    @Query() query: any,
+  ) {
+    // Transforma filtros de query para FilterLeadsDto
+    const filterDto: FilterLeadsDto = {
+      nome_razao_social: query.nome_razao_social || query.nome,
+      email: query.email,
+      telefone: query.telefone,
+      uf: query.uf
+        ? Array.isArray(query.uf)
+          ? query.uf
+          : [query.uf]
+        : undefined,
+      vendedor_id: query.vendedor_id ? parseInt(query.vendedor_id, 10) : undefined,
+      usuario_id_colaborador: query.usuario_id_colaborador ? parseInt(query.usuario_id_colaborador, 10) : undefined,
+      origem_lead: query.origem_lead,
+      produtos: query.produtos 
+        ? Array.isArray(query.produtos) 
+          ? query.produtos.map((p: string) => parseInt(p, 10))
+          : [parseInt(query.produtos, 10)]
+        : undefined,
+    };
+
+    return this.kanbanBoardsService.bulkAddProduto(
+      boardId,
+      bulkAddProdutoDto,
+      filterDto,
+      req.user,
+    );
+  }
+
+  /**
+   * Remove produto (tag) de todos os leads visíveis de um board
+   * DELETE /kanban-boards/:boardId/leads/bulk-remove-produto
+   */
+  @Delete(':boardId/leads/bulk-remove-produto')
+  bulkRemoveProduto(
+    @Param('boardId', ParseIntPipe) boardId: number,
+    @Body() bulkRemoveProdutoDto: BulkRemoveProdutoDto,
+    @Request() req,
+    @Query() query: any,
+  ) {
+    // Transforma filtros de query para FilterLeadsDto
+    const filterDto: FilterLeadsDto = {
+      nome_razao_social: query.nome_razao_social || query.nome,
+      email: query.email,
+      telefone: query.telefone,
+      uf: query.uf
+        ? Array.isArray(query.uf)
+          ? query.uf
+          : [query.uf]
+        : undefined,
+      vendedor_id: query.vendedor_id ? parseInt(query.vendedor_id, 10) : undefined,
+      usuario_id_colaborador: query.usuario_id_colaborador ? parseInt(query.usuario_id_colaborador, 10) : undefined,
+      origem_lead: query.origem_lead,
+      produtos: query.produtos 
+        ? Array.isArray(query.produtos) 
+          ? query.produtos.map((p: string) => parseInt(p, 10))
+          : [parseInt(query.produtos, 10)]
+        : undefined,
+    };
+
+    return this.kanbanBoardsService.bulkRemoveProduto(
+      boardId,
+      bulkRemoveProdutoDto,
+      filterDto,
+      req.user,
+    );
   }
 }
 

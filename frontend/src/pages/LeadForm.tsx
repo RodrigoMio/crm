@@ -317,11 +317,12 @@ export default function LeadForm() {
           </div>
 
           <div className="form-group">
-            <label>Produtos de interesse</label>
             <ProductTagsInput
               value={formData.produtos || []}
               onChange={(produtos) => setFormData({ ...formData, produtos })}
               isAdmin={user?.perfil === 'ADMIN'}
+              showViewAllButton={true}
+              label="Produtos de interesse"
             />
           </div>
         </div>

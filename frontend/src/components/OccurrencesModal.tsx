@@ -217,6 +217,33 @@ export default function OccurrencesModal({ leadId, leadName, onClose }: Occurren
     })
   }
 
+  // Função para renderizar texto com quebras de linha e links
+  const renderTextWithLinks = (text: string) => {
+    if (!text) return text
+    
+    // Regex para detectar URLs (http:// ou https://)
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+    const parts = text.split(urlRegex)
+    
+    return parts.map((part, index) => {
+      // Verifica se a parte é uma URL
+      if (part.startsWith('http://') || part.startsWith('https://')) {
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#007bff', textDecoration: 'underline' }}
+          >
+            {part}
+          </a>
+        )
+      }
+      return <span key={index}>{part}</span>
+    })
+  }
+
   return (
     <div className="occurrences-modal-overlay" onClick={onClose}>
       <div className="occurrences-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -265,7 +292,7 @@ export default function OccurrencesModal({ leadId, leadName, onClose }: Occurren
                       value={newOccurrenceText}
                       onChange={(e) => setNewOccurrenceText(e.target.value)}
                       placeholder="Digite a ocorrência..."
-                      maxLength={255}
+                      maxLength={1000}
                       rows={4}
                       style={{
                         width: '100%',
@@ -278,7 +305,7 @@ export default function OccurrencesModal({ leadId, leadName, onClose }: Occurren
                       }}
                     />
                     <div style={{ fontSize: '12px', color: '#666', marginTop: '0.25rem' }}>
-                      {newOccurrenceText.length}/255 caracteres
+                      {newOccurrenceText.length}/1000 caracteres
                     </div>
                   </div>
                   <button
@@ -328,8 +355,8 @@ export default function OccurrencesModal({ leadId, leadName, onClose }: Occurren
                             <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>
                               {occurrence.usuario?.nome || '-'}
                             </td>
-                            <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>
-                              {occurrence.texto}
+                            <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                              {renderTextWithLinks(occurrence.texto)}
                             </td>
                             <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee', textAlign: 'center' }}>
                               {canDelete(occurrence) && (
@@ -395,8 +422,8 @@ export default function OccurrencesModal({ leadId, leadName, onClose }: Occurren
                             <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>
                               {occurrence.usuario?.nome || '-'}
                             </td>
-                            <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>
-                              {occurrence.texto}
+                            <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                              {renderTextWithLinks(occurrence.texto)}
                             </td>
                           </tr>
                         ))}

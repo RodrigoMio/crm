@@ -4,6 +4,7 @@ import { toast } from 'react-toastify'
 import { api } from '../services/api'
 import { BoardWithLeadsCount, CreateKanbanBoardDto, KanbanBoardType, MoveLeadDto } from '../types/kanban-board'
 import { Lead, FilterLeadsDto } from '../types/lead'
+import { useAuth } from '../contexts/AuthContext'
 import OccurrencesModal from '../components/OccurrencesModal'
 import EditLeadModal from '../components/EditLeadModal'
 import ScheduleContactModal from '../components/ScheduleContactModal'
@@ -19,6 +20,7 @@ const STORAGE_KEY_TIPO_FLUXO = 'kanban-admin-tipo-fluxo'
 type SearchType = 'nome' | 'email' | 'telefone'
 
 export default function KanbanAdmin() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
@@ -283,7 +285,10 @@ export default function KanbanAdmin() {
           params.append('telefone', filters.telefone)
         }
         if (filters.uf) {
-          params.append('uf', filters.uf)
+          const ufs = Array.isArray(filters.uf) ? filters.uf : [filters.uf]
+          ufs.forEach(uf => {
+            params.append('uf', uf)
+          })
         }
         if (filters.vendedor_id) {
           params.append('vendedor_id', filters.vendedor_id.toString())
@@ -811,6 +816,69 @@ export default function KanbanAdmin() {
                 >
                   +
                 </button>
+                {user?.perfil === 'ADMIN' && (
+                  <button
+                    className="btn-export-leads"
+                    onClick={async (e) => {
+                    e.stopPropagation()
+                    try {
+                      const params = new URLSearchParams()
+                      if (filters.nome_razao_social) {
+                        params.append('nome_razao_social', filters.nome_razao_social)
+                      }
+                      if (filters.email) {
+                        params.append('email', filters.email)
+                      }
+                      if (filters.telefone) {
+                        params.append('telefone', filters.telefone)
+                      }
+                      if (filters.uf) {
+                        const ufs = Array.isArray(filters.uf) ? filters.uf : [filters.uf]
+                        ufs.forEach(uf => {
+                          params.append('uf', uf)
+                        })
+                      }
+                      if (filters.vendedor_id) {
+                        params.append('vendedor_id', filters.vendedor_id.toString())
+                      }
+                      if (filters.usuario_id_colaborador) {
+                        params.append('usuario_id_colaborador', filters.usuario_id_colaborador.toString())
+                      }
+                      if (filters.origem_lead) {
+                        params.append('origem_lead', filters.origem_lead)
+                      }
+                      if (filters.produtos && filters.produtos.length > 0) {
+                        filters.produtos.forEach(produtoId => {
+                          params.append('produtos', produtoId.toString())
+                        })
+                      }
+                      const response = await api.get(`/kanban-boards/${board.id}/leads/export?${params.toString()}`, {
+                        responseType: 'blob'
+                      })
+                      const url = window.URL.createObjectURL(new Blob([response.data]))
+                      const link = document.createElement('a')
+                      link.href = url
+                      link.setAttribute('download', `leads-${board.nome.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`)
+                      document.body.appendChild(link)
+                      link.click()
+                      link.remove()
+                      window.URL.revokeObjectURL(url)
+                      toast.success('Leads exportados com sucesso!')
+                    } catch (error: any) {
+                      console.error('Erro ao exportar leads:', error)
+                      toast.error(error.response?.data?.message || 'Erro ao exportar leads')
+                    }
+                  }}
+                  title="Exportar leads"
+                  disabled={!boardLeads[board.id]?.total || boardLeads[board.id].total === 0}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="9" y1="3" x2="9" y2="21"></line>
+                    <line x1="3" y1="9" x2="21" y2="9"></line>
+                  </svg>
+                  </button>
+                )}
                 <span className="board-count">
                   {hasAnyFilter && boardLeads[board.id]?.total !== undefined
                     ? `${boardLeads[board.id].total} de ${board.leads_count || 0}`
@@ -925,11 +993,40 @@ export default function KanbanAdmin() {
                       </div>
                       {lead.produtos && lead.produtos.length > 0 && (
                         <div className="card-product-tags">
-                          {lead.produtos.map((produto) => (
-                            <span key={produto.produto_id} className="card-product-tag">
-                              {produto.descricao}
-                            </span>
-                          ))}
+                          {lead.produtos.map((produto) => {
+                            // Função helper para limpar e validar valores de cor
+                            const cleanColorValue = (colorValue: string | null | undefined, fallback: string): string => {
+                              if (!colorValue) return fallback;
+                              // Remove espaços, pontos e vírgulas no final, e valida formato hex
+                              const cleaned = colorValue.trim().replace(/[;\s]+$/, '');
+                              // Valida se é um valor hex válido ou nome de cor CSS válido
+                              if (cleaned === '' || cleaned.length === 0) return fallback;
+                              return cleaned;
+                            };
+                            
+                            const bgColor = cleanColorValue(produto.produto_tipo?.bg_color, '#e3f2fd');
+                            const textColor = cleanColorValue(produto.produto_tipo?.color, '#1976d2');
+                            
+                            // Debug: log se produto_tipo não estiver disponível ou se cores estiverem vazias
+                            if (!produto.produto_tipo) {
+                              console.warn(`[KanbanAdmin] Produto ${produto.produto_id} (${produto.descricao}) não tem produto_tipo`);
+                            } else if (!produto.produto_tipo.bg_color || produto.produto_tipo.bg_color.trim() === '') {
+                              console.warn(`[KanbanAdmin] Produto ${produto.produto_id} (${produto.descricao}) tem produto_tipo mas bg_color está vazio/null`);
+                            }
+                            
+                            return (
+                              <span 
+                                key={produto.produto_id} 
+                                className="card-product-tag"
+                                style={{ 
+                                  backgroundColor: bgColor,
+                                  color: textColor
+                                }}
+                              >
+                                {produto.descricao}
+                              </span>
+                            );
+                          })}
                         </div>
                       )}
                       <div className="card-footer">
@@ -974,7 +1071,10 @@ export default function KanbanAdmin() {
                               params.append('telefone', filters.telefone)
                             }
                             if (filters.uf) {
-                              params.append('uf', filters.uf)
+                              const ufs = Array.isArray(filters.uf) ? filters.uf : [filters.uf]
+                              ufs.forEach(uf => {
+                                params.append('uf', uf)
+                              })
                             }
                             if (filters.vendedor_id) {
                               params.append('vendedor_id', filters.vendedor_id.toString())
@@ -1155,22 +1255,26 @@ export default function KanbanAdmin() {
       />
 
       {/* Modal de Criação de Lead */}
-      {selectedBoardForNewLead && (
-        <div className="modal-overlay" onClick={() => setSelectedBoardForNewLead(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%' }}>
-            <CreateLeadInBoardModal
-              boardId={selectedBoardForNewLead}
-              onClose={() => setSelectedBoardForNewLead(null)}
-              onSuccess={() => {
-                setSelectedBoardForNewLead(null)
-                setCurrentPage(1)
-                queryClient.invalidateQueries({ queryKey: ['kanban-board-leads-all'] })
-              }}
-              invalidateQueries={['kanban-board-leads-all']}
-            />
+      {selectedBoardForNewLead && (() => {
+        const selectedBoard = boards.find(b => b.id === selectedBoardForNewLead)
+        return (
+          <div className="modal-overlay" onClick={() => setSelectedBoardForNewLead(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%' }}>
+              <CreateLeadInBoardModal
+                boardId={selectedBoardForNewLead}
+                onClose={() => setSelectedBoardForNewLead(null)}
+                onSuccess={() => {
+                  setSelectedBoardForNewLead(null)
+                  setCurrentPage(1)
+                  queryClient.invalidateQueries({ queryKey: ['kanban-board-leads-all'] })
+                }}
+                invalidateQueries={['kanban-board-leads-all']}
+                tipoFluxo={selectedBoard?.tipo_fluxo || undefined}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

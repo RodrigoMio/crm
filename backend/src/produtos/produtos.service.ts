@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike } from 'typeorm';
 import { Produto } from './entities/produto.entity';
+import { ProdutoTipo } from './entities/produto-tipo.entity';
 import { CreateProdutoDto } from './dto/create-produto.dto';
 
 @Injectable()
@@ -9,6 +10,8 @@ export class ProdutosService {
   constructor(
     @InjectRepository(Produto)
     private produtoRepository: Repository<Produto>,
+    @InjectRepository(ProdutoTipo)
+    private produtoTipoRepository: Repository<ProdutoTipo>,
   ) {}
 
   /**
@@ -87,8 +90,20 @@ export class ProdutosService {
     }
 
     // Cria novo produto
+    const produtoTipoId = createProdutoDto.produto_tipo_id || 1;
+    
+    // Valida se o tipo existe
+    const produtoTipo = await this.produtoTipoRepository.findOne({
+      where: { produto_tipo_id: produtoTipoId },
+    });
+    
+    if (!produtoTipo) {
+      throw new BadRequestException(`Tipo de produto com ID ${produtoTipoId} não encontrado`);
+    }
+
     const produto = this.produtoRepository.create({
       descricao: descricaoNormalizada,
+      produto_tipo_id: produtoTipoId,
     });
 
     return this.produtoRepository.save(produto);
@@ -99,6 +114,17 @@ export class ProdutosService {
    */
   async findAll(): Promise<Produto[]> {
     return this.produtoRepository.find({
+      order: {
+        descricao: 'ASC',
+      },
+    });
+  }
+
+  /**
+   * Busca todos os tipos de produto ordenados alfabeticamente
+   */
+  async findAllTipos(): Promise<ProdutoTipo[]> {
+    return this.produtoTipoRepository.find({
       order: {
         descricao: 'ASC',
       },

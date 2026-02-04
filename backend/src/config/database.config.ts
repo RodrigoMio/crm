@@ -5,6 +5,7 @@ import { DataSourceOptions } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { Lead } from '../leads/entities/lead.entity';
 import { Produto } from '../produtos/entities/produto.entity';
+import { ProdutoTipo } from '../produtos/entities/produto-tipo.entity';
 import { Ocorrencia } from '../ocorrencias/entities/ocorrencia.entity';
 import { LeadOcorrencia } from '../lead-ocorrencias/entities/lead-ocorrencia.entity';
 import { LeadsProduto } from '../leads-produtos/entities/leads-produto.entity';
@@ -45,6 +46,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         User,
         Lead,
         Produto,
+        ProdutoTipo,
         Ocorrencia,
         LeadOcorrencia,
         LeadsProduto,

@@ -246,7 +246,10 @@ export default function LeadsList() {
         params.append('telefone', filters.telefone)
       }
       if (filters.uf) {
-        params.append('uf', filters.uf)
+        const ufs = Array.isArray(filters.uf) ? filters.uf : [filters.uf]
+        ufs.forEach(uf => {
+          params.append('uf', uf)
+        })
       }
       if (filters.vendedor_id) {
         params.append('vendedor_id', filters.vendedor_id)
@@ -796,25 +799,6 @@ export default function LeadsList() {
                           </button>
                         </div>
                         <div className="lead-card-compact-content">
-                          {user?.perfil === 'ADMIN' && (
-                            <div className="lead-card-field-compact">
-                              <span className="lead-card-label-compact">Vendedor</span>
-                              <span className="lead-card-value-compact">{lead.vendedor?.nome || '-'}</span>
-                            </div>
-                          )}
-                          <div className="lead-card-field-compact">
-                            <span className="lead-card-label-compact">Colaborador</span>
-                            <span className="lead-card-value-compact">{lead.colaborador?.nome || '-'}</span>
-                          </div>
-                          <div className="lead-card-field-compact">
-                            <span className="lead-card-label-compact">Situação</span>
-                            <span className="lead-card-value-compact" style={{ 
-                              color: lead.kanbanStatus?.text_color || lead.kanbanStatus?.bg_color || '#7f8c8d',
-                              fontWeight: '600'
-                            }}>
-                              {lead.kanbanStatus?.descricao || '-'}
-                            </span>
-                          </div>
                         </div>
                       </div>
 
@@ -828,14 +812,6 @@ export default function LeadsList() {
                           <div className="lead-card-field">
                             <span className="lead-card-label">Data Entrada</span>
                             <span className="lead-card-value">{new Date(lead.data_entrada).toLocaleDateString('pt-BR')}</span>
-                          </div>
-                          <div className="lead-card-field">
-                            <span className="lead-card-label">Telefone</span>
-                            <span className="lead-card-value">{lead.telefone || '-'}</span>
-                          </div>
-                          <div className="lead-card-field">
-                            <span className="lead-card-label">Email</span>
-                            <span className="lead-card-value">{lead.email || '-'}</span>
                           </div>
                           <div className="lead-card-field">
                             <span className="lead-card-label">UF</span>
@@ -940,28 +916,6 @@ export default function LeadsList() {
                           <span className="lead-card-label">Data Entrada</span>
                           <span className="lead-card-value">{new Date(lead.data_entrada).toLocaleDateString('pt-BR')}</span>
                         </div>
-                        {user?.perfil === 'ADMIN' && (
-                          <div className="lead-card-field">
-                            <span className="lead-card-label">Vendedor</span>
-                            <span className="lead-card-value">{lead.vendedor?.nome || '-'}</span>
-                          </div>
-                        )}
-                        <div className="lead-card-field">
-                          <span className="lead-card-label">Colaborador</span>
-                          <span className="lead-card-value">{lead.colaborador?.nome || '-'}</span>
-                        </div>
-                        <div className="lead-card-field">
-                          <span className="lead-card-label">Situação</span>
-                          <span className="lead-card-value">{lead.kanbanStatus?.descricao || '-'}</span>
-                        </div>
-                        <div className="lead-card-field">
-                          <span className="lead-card-label">Telefone</span>
-                          <span className="lead-card-value">{lead.telefone || '-'}</span>
-                        </div>
-                        <div className="lead-card-field">
-                          <span className="lead-card-label">Email</span>
-                          <span className="lead-card-value">{lead.email || '-'}</span>
-                        </div>
                         <div className="lead-card-field">
                           <span className="lead-card-label">UF</span>
                           <span className="lead-card-value">{lead.uf || '-'}</span>
@@ -1001,11 +955,6 @@ export default function LeadsList() {
                   <th>ID</th>
                   <th>Data Entrada</th>
                   <th>Nome/Razão Social</th>
-                  {user?.perfil === 'ADMIN' && <th>Vendedor</th>}
-                  <th>Colaborador</th>
-                  <th>Situação</th>
-                  <th>Telefone</th>
-                  <th>Email</th>
                   <th>UF</th>
                   <th>Município</th>
                   <th>Ações</th>
@@ -1014,7 +963,7 @@ export default function LeadsList() {
               <tbody>
                 {leads.length === 0 ? (
                   <tr>
-                    <td colSpan={user?.perfil === 'ADMIN' ? 12 : 11}>
+                    <td colSpan={6}>
                       Nenhum lead encontrado
                     </td>
                   </tr>
@@ -1037,13 +986,6 @@ export default function LeadsList() {
                         </td>
                         <td>{new Date(lead.data_entrada).toLocaleDateString('pt-BR')}</td>
                         <td>{lead.nome_razao_social}</td>
-                        {user?.perfil === 'ADMIN' && (
-                          <td>{lead.vendedor?.nome || '-'}</td>
-                        )}
-                        <td>{lead.colaborador?.nome || '-'}</td>
-                        <td>{lead.kanbanStatus?.descricao || '-'}</td>
-                        <td>{lead.telefone || '-'}</td>
-                        <td>{lead.email || '-'}</td>
                         <td>{lead.uf || '-'}</td>
                         <td>{lead.municipio || '-'}</td>
                         <td onClick={(e) => e.stopPropagation()}>

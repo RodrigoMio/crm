@@ -11,6 +11,8 @@ import ScheduleContactModal from '../components/ScheduleContactModal'
 import AppointmentBadge from '../components/AppointmentBadge'
 import FiltersModal from '../components/FiltersModal'
 import CreateLeadInBoardModal from '../components/CreateLeadInBoardModal'
+import BulkTagSelectModal from '../components/BulkTagSelectModal'
+import BulkTagConfirmModal from '../components/BulkTagConfirmModal'
 import { FilterLeadsDto } from '../types/lead'
 import './KanbanColaborador.css'
 
@@ -40,6 +42,10 @@ export default function KanbanColaborador() {
   const [showFiltersModal, setShowFiltersModal] = useState(false)
   const [availableTypes, setAvailableTypes] = useState<('COMPRADOR' | 'VENDEDOR')[]>([])
   const [selectedBoardForNewLead, setSelectedBoardForNewLead] = useState<number | null>(null)
+  const [showBulkTagSelectModal, setShowBulkTagSelectModal] = useState(false)
+  const [showBulkTagConfirmModal, setShowBulkTagConfirmModal] = useState(false)
+  const [selectedBoardForBulkTag, setSelectedBoardForBulkTag] = useState<number | null>(null)
+  const [selectedProdutoForBulkTag, setSelectedProdutoForBulkTag] = useState<{ id: number; descricao: string } | null>(null)
   
   // Estado para controlar boards minimizados (chave: board.id, valor: true se minimizado)
   const [minimizedBoards, setMinimizedBoards] = useState<Record<number, boolean>>(() => {
@@ -403,11 +409,15 @@ export default function KanbanColaborador() {
       
       // Define default do tipoFluxo se não estiver definido ou se o tipo atual não estiver disponível
       if (sortedTipos.length > 0) {
-        if (!tipoFluxo || !sortedTipos.includes(tipoFluxo)) {
-          // Default: COMPRADOR se disponível, senão o primeiro disponível
-          const defaultTipo = sortedTipos.includes('COMPRADOR') ? 'COMPRADOR' : sortedTipos[0]
-          setTipoFluxo(defaultTipo)
-        }
+        setTipoFluxo(prevTipoFluxo => {
+          // Só atualiza se o tipo atual não estiver disponível ou se não houver tipo definido
+          if (!prevTipoFluxo || !sortedTipos.includes(prevTipoFluxo)) {
+            // Default: COMPRADOR se disponível, senão o primeiro disponível
+            const defaultTipo = sortedTipos.includes('COMPRADOR') ? 'COMPRADOR' : sortedTipos[0]
+            return defaultTipo
+          }
+          return prevTipoFluxo
+        })
       } else {
         setTipoFluxo(null)
       }
@@ -416,7 +426,7 @@ export default function KanbanColaborador() {
       setAvailableTypes([])
       setTipoFluxo(null)
     }
-  }, [allBoards, modelos, shouldLoadBoards, tipoFluxo])
+  }, [allBoards, modelos, shouldLoadBoards])
 
   // Busca boards filtrados por tipo_fluxo
   const { data: boards = [], isLoading: boardsLoading, error: boardsError } = useQuery<BoardWithLeadsCount[]>({
@@ -459,7 +469,10 @@ export default function KanbanColaborador() {
           params.append('telefone', filters.telefone)
         }
         if (filters.uf) {
-          params.append('uf', filters.uf)
+          const ufs = Array.isArray(filters.uf) ? filters.uf : [filters.uf]
+          ufs.forEach(uf => {
+            params.append('uf', uf)
+          })
         }
         if (filters.vendedor_id) {
           params.append('vendedor_id', filters.vendedor_id.toString())
@@ -962,6 +975,85 @@ export default function KanbanColaborador() {
                       >
                         +
                       </button>
+                      {user?.perfil === 'ADMIN' && (
+                        <>
+                          <button
+                            className="btn-export-leads"
+                            onClick={async (e) => {
+                            e.stopPropagation()
+                            try {
+                              const params = new URLSearchParams()
+                              if (filters.nome_razao_social) {
+                                params.append('nome_razao_social', filters.nome_razao_social)
+                              }
+                              if (filters.email) {
+                                params.append('email', filters.email)
+                              }
+                              if (filters.telefone) {
+                                params.append('telefone', filters.telefone)
+                              }
+                              if (filters.uf) {
+                                const ufs = Array.isArray(filters.uf) ? filters.uf : [filters.uf]
+                                ufs.forEach(uf => {
+                                  params.append('uf', uf)
+                                })
+                              }
+                              if (filters.vendedor_id) {
+                                params.append('vendedor_id', filters.vendedor_id.toString())
+                              }
+                              if (filters.usuario_id_colaborador) {
+                                params.append('usuario_id_colaborador', filters.usuario_id_colaborador.toString())
+                              }
+                              if (filters.origem_lead) {
+                                params.append('origem_lead', filters.origem_lead)
+                              }
+                              if (filters.produtos && filters.produtos.length > 0) {
+                                filters.produtos.forEach(produtoId => {
+                                  params.append('produtos', produtoId.toString())
+                                })
+                              }
+                              const response = await api.get(`/kanban-boards/${board.id}/leads/export?${params.toString()}`, {
+                                responseType: 'blob'
+                              })
+                              const url = window.URL.createObjectURL(new Blob([response.data]))
+                              const link = document.createElement('a')
+                              link.href = url
+                              link.setAttribute('download', `leads-${board.nome.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`)
+                              document.body.appendChild(link)
+                              link.click()
+                              link.remove()
+                              window.URL.revokeObjectURL(url)
+                              toast.success('Leads exportados com sucesso!')
+                            } catch (error: any) {
+                              console.error('Erro ao exportar leads:', error)
+                              toast.error(error.response?.data?.message || 'Erro ao exportar leads')
+                            }
+                          }}
+                          title="Exportar leads"
+                          disabled={!boardLeads[board.id]?.total || boardLeads[board.id].total === 0}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="9" y1="3" x2="9" y2="21"></line>
+                            <line x1="3" y1="9" x2="21" y2="9"></line>
+                          </svg>
+                          </button>
+                          <button
+                            className="btn-bulk-tag"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedBoardForBulkTag(board.id)
+                              setShowBulkTagSelectModal(true)
+                            }}
+                            title="Adicionar/Remover tags"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                              <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                            </svg>
+                          </button>
+                        </>
+                      )}
                       <span className="board-count">
                         {hasAnyFilter && boardLeads[board.id]?.total !== undefined
                           ? `${boardLeads[board.id].total} de ${board.leads_count || 0}`
@@ -1053,11 +1145,33 @@ export default function KanbanColaborador() {
                           )}
                           {!isMinimized && lead.produtos && lead.produtos.length > 0 && (
                             <div className="card-product-tags">
-                              {lead.produtos.map((produto) => (
-                                <span key={produto.produto_id} className="card-product-tag">
-                                  {produto.descricao}
-                                </span>
-                              ))}
+                              {lead.produtos.map((produto) => {
+                                // Função helper para limpar e validar valores de cor
+                                const cleanColorValue = (colorValue: string | null | undefined, fallback: string): string => {
+                                  if (!colorValue) return fallback;
+                                  // Remove espaços, pontos e vírgulas no final, e valida formato hex
+                                  const cleaned = colorValue.trim().replace(/[;\s]+$/, '');
+                                  // Valida se é um valor hex válido ou nome de cor CSS válido
+                                  if (cleaned === '' || cleaned.length === 0) return fallback;
+                                  return cleaned;
+                                };
+                                
+                                const bgColor = cleanColorValue(produto.produto_tipo?.bg_color, '#e3f2fd');
+                                const textColor = cleanColorValue(produto.produto_tipo?.color, '#1976d2');
+                                
+                                return (
+                                  <span 
+                                    key={produto.produto_id} 
+                                    className="card-product-tag"
+                                    style={{ 
+                                      backgroundColor: bgColor,
+                                      color: textColor
+                                    }}
+                                  >
+                                    {produto.descricao}
+                                  </span>
+                                );
+                              })}
                             </div>
                           )}
                           {!isMinimized && (
@@ -1102,7 +1216,10 @@ export default function KanbanColaborador() {
                                 params.append('telefone', filters.telefone)
                               }
                               if (filters.uf) {
-                                params.append('uf', filters.uf)
+                                const ufs = Array.isArray(filters.uf) ? filters.uf : [filters.uf]
+                                ufs.forEach(uf => {
+                                  params.append('uf', uf)
+                                })
                               }
                               if (filters.vendedor_id) {
                                 params.append('vendedor_id', filters.vendedor_id.toString())
@@ -1211,21 +1328,60 @@ export default function KanbanColaborador() {
       />
 
       {/* Modal de Criação de Lead */}
-      {selectedBoardForNewLead && (
-        <div className="modal-overlay" onClick={() => setSelectedBoardForNewLead(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%' }}>
-            <CreateLeadInBoardModal
-              boardId={selectedBoardForNewLead}
-              onClose={() => setSelectedBoardForNewLead(null)}
-              onSuccess={() => {
-                setSelectedBoardForNewLead(null)
-                setCurrentPage(1)
-                queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
-              }}
-              invalidateQueries={['kanban-board-leads-all-colaborador']}
-            />
+      {selectedBoardForNewLead && (() => {
+        const selectedBoard = boards.find(b => b.id === selectedBoardForNewLead)
+        return (
+          <div className="modal-overlay" onClick={() => setSelectedBoardForNewLead(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%' }}>
+              <CreateLeadInBoardModal
+                boardId={selectedBoardForNewLead}
+                onClose={() => setSelectedBoardForNewLead(null)}
+                onSuccess={() => {
+                  setSelectedBoardForNewLead(null)
+                  setCurrentPage(1)
+                  queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
+                }}
+                invalidateQueries={['kanban-board-leads-all-colaborador']}
+                tipoFluxo={selectedBoard?.tipo_fluxo || undefined}
+              />
+            </div>
           </div>
-        </div>
+        )
+      })()}
+
+      {/* Modal de Seleção de Tag para Atribuir em Massa */}
+      <BulkTagSelectModal
+        isOpen={showBulkTagSelectModal}
+        onClose={() => {
+          setShowBulkTagSelectModal(false)
+          setSelectedBoardForBulkTag(null)
+        }}
+        onSelect={(produtoId, produtoDescricao) => {
+          setSelectedProdutoForBulkTag({ id: produtoId, descricao: produtoDescricao })
+          setShowBulkTagSelectModal(false)
+          setShowBulkTagConfirmModal(true)
+        }}
+        isAdmin={user?.perfil === 'ADMIN'}
+        boardName={selectedBoardForBulkTag ? boards.find(b => b.id === selectedBoardForBulkTag)?.nome || '' : ''}
+      />
+
+      {/* Modal de Confirmação de Tag em Massa */}
+      {selectedBoardForBulkTag && selectedProdutoForBulkTag && (
+        <BulkTagConfirmModal
+          isOpen={showBulkTagConfirmModal}
+          onClose={() => {
+            setShowBulkTagConfirmModal(false)
+            setSelectedBoardForBulkTag(null)
+            setSelectedProdutoForBulkTag(null)
+          }}
+          produtoId={selectedProdutoForBulkTag.id}
+          produtoDescricao={selectedProdutoForBulkTag.descricao}
+          boardId={selectedBoardForBulkTag}
+          filters={filters}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
+          }}
+        />
       )}
     </div>
   )

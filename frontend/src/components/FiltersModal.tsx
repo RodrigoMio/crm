@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { FilterLeadsDto, OrigemLead } from '../types/lead'
 import ProductTagsInput from './ProductTagsInput'
+import UFTagsInput from './UFTagsInput'
 import './FiltersModal.css'
 
 interface FiltersModalProps {
@@ -84,30 +85,22 @@ export default function FiltersModal({
           </div>
 
           <div className="filter-group" style={{ gridColumn: 'span 2', minWidth: '300px' }}>
-            <label>Produtos de interesse</label>
             <ProductTagsInput
               value={localFilters.produtos || []}
               onChange={(produtos) => handleFilterChange({ produtos: produtos.length > 0 ? produtos : undefined })}
               isAdmin={isAdmin}
-              allowCreateNew={false}
+              allowCreateNew={isAdmin}
+              showViewAllButton={true}
+              label="Produtos de interesse"
             />
           </div>
 
           <div className="filter-group">
             <label>UF</label>
-            <select
-              value={localFilters.uf || ''}
-              onChange={(e) =>
-                handleFilterChange({ uf: e.target.value || undefined })
-              }
-            >
-              <option value="">Todas</option>
-              {['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'].map((uf) => (
-                <option key={uf} value={uf}>
-                  {uf}
-                </option>
-              ))}
-            </select>
+            <UFTagsInput
+              value={Array.isArray(localFilters.uf) ? localFilters.uf : localFilters.uf ? [localFilters.uf] : []}
+              onChange={(ufs) => handleFilterChange({ uf: ufs.length > 0 ? ufs : undefined })}
+            />
           </div>
 
           <div className="filter-group">

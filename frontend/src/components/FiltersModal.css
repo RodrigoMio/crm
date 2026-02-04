@@ -7,10 +7,12 @@
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
   display: flex;
-  align-items: flex-end;
+  /*align-items: flex-end;*/
   justify-content: center;
   z-index: 1500;
   padding: 0;
+  width: 80%;
+  place-self: anchor-center;
 }
 
 .filters-modal-content {
@@ -45,6 +47,29 @@
   background: white;
   z-index: 10;
   border-radius: 16px 16px 0 0;
+
+}
+
+/* Desktop: modal centralizado (>= 768px) */
+@media (min-width: 768px) {
+  .filters-modal-overlay {
+    align-items: center;
+    padding: 1rem;
+    align-items: flex-end;
+  }
+
+  .filters-modal-content {
+    width: 100%;
+    max-width: 800px;
+    max-height: 85vh;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    animation: none;
+  }
+
+  .filters-modal-header {
+    border-radius: 16px 16px 0 0;
+  }
 }
 
 .filters-modal-header h2 {
@@ -89,6 +114,66 @@
   gap: 0.5rem;
 }
 
+/* Desktop: layout em grid para alinhar campos na mesma linha */
+@media (min-width: 768px) {
+  .filters-modal-content .filters.filters-mobile,
+  .filters-modal-content .filters-mobile {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 1rem;
+    flex: none !important;
+    flex-direction: unset !important;
+    background: transparent !important;
+    padding: 1.5rem !important;
+    border-radius: 0 !important;
+    margin-bottom: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Nome/Razão Social ocupa linha completa */
+  .filters-modal-content .filters.filters-mobile .filter-group:first-of-type,
+  .filters-modal-content .filters-mobile .filter-group:first-of-type {
+    grid-column: span 4 !important;
+  }
+
+  /* Produtos de interesse ocupa linha completa (sobrescreve style inline) */
+  .filters-modal-content .filters.filters-mobile .filter-group:nth-of-type(2),
+  .filters-modal-content .filters-mobile .filter-group:nth-of-type(2) {
+    grid-column: span 4 !important;
+    min-width: auto !important;
+  }
+
+  /* UF (3º elemento) - 1 coluna */
+  .filters-modal-content .filters.filters-mobile .filter-group:nth-of-type(3),
+  .filters-modal-content .filters-mobile .filter-group:nth-of-type(3) {
+    grid-column: span 1 !important;
+  }
+
+  /* Origem do Lead (4º elemento) - 1 coluna */
+  .filters-modal-content .filters.filters-mobile .filter-group:nth-of-type(4),
+  .filters-modal-content .filters-mobile .filter-group:nth-of-type(4) {
+    grid-column: span 1 !important;
+  }
+
+  /* Vendedor (5º elemento, se isAdmin) ou Colaborador (5º elemento, se isAgente) - 1 coluna */
+  .filters-modal-content .filters.filters-mobile .filter-group:nth-of-type(5),
+  .filters-modal-content .filters-mobile .filter-group:nth-of-type(5) {
+    grid-column: span 1 !important;
+  }
+
+  /* Colaborador (6º elemento, se existir junto com Vendedor) - 1 coluna */
+  .filters-modal-content .filters.filters-mobile .filter-group:nth-of-type(6),
+  .filters-modal-content .filters-mobile .filter-group:nth-of-type(6) {
+    grid-column: span 1 !important;
+  }
+
+  /* Limpar filtro (último elemento) - 1 coluna, fica na mesma linha dos anteriores */
+  .filters-modal-content .filters.filters-mobile .filter-group:last-of-type,
+  .filters-modal-content .filters-mobile .filter-group:last-of-type {
+    grid-column: span 1 !important;
+  }
+}
+
 .filters-modal-actions {
   padding: 1rem 1.5rem;
   border-top: 1px solid #eee;
@@ -98,7 +183,26 @@
   border-radius: 0 0 16px 16px;
 }
 
-/* Ajustes para mobile */
+/* Ajustes para mobile (< 768px) */
+@media (max-width: 767px) {
+  .filters-modal-content {
+    max-height: 90vh;
+  }
+
+  .filters-modal-header {
+    padding: 1rem;
+  }
+
+  .filters-modal-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .filters-mobile {
+    padding: 1rem;
+  }
+}
+
+/* Ajustes adicionais para mobile pequeno */
 @media (max-width: 480px) {
   .filters-modal-content {
     max-height: 90vh;

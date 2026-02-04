@@ -16,8 +16,7 @@ export class FilterLeadsDto {
   telefone?: string;
 
   @IsOptional()
-  @IsString()
-  uf?: string;
+  uf?: string | string[];
 
   @IsOptional()
   @Type(() => Number)

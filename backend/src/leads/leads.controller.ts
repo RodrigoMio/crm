@@ -49,12 +49,18 @@ export class LeadsController {
   @Get()
   findAll(@Query() query: any, @Request() req) {
     // Transforma produtos de string/array para number[]
+    // Transforma uf de string/array para string[]
     const filterDto: FilterLeadsDto = {
       ...query,
       produtos: query.produtos 
         ? Array.isArray(query.produtos) 
           ? query.produtos.map((p: string) => parseInt(p, 10))
           : [parseInt(query.produtos, 10)]
+        : undefined,
+      uf: query.uf
+        ? Array.isArray(query.uf)
+          ? query.uf
+          : [query.uf]
         : undefined,
       vendedor_id: query.vendedor_id ? parseInt(query.vendedor_id, 10) : undefined,
       usuario_id_colaborador: query.usuario_id_colaborador ? parseInt(query.usuario_id_colaborador, 10) : undefined,

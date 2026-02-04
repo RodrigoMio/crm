@@ -95,7 +95,7 @@ export interface FilterLeadsDto {
   nome_razao_social?: string
   email?: string
   telefone?: string
-  uf?: string
+  uf?: string | string[] // Aceita string (compatibilidade) ou array de strings
   vendedor_id?: string
   usuario_id_colaborador?: number
   origem_lead?: OrigemLead

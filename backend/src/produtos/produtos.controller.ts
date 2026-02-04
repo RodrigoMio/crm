@@ -17,6 +17,16 @@ export class ProdutosController {
   constructor(private readonly produtosService: ProdutosService) {}
 
   /**
+   * Busca todos os tipos de produto
+   * GET /produtos/tipos
+   * IMPORTANTE: Esta rota deve vir ANTES de @Get() para evitar conflito
+   */
+  @Get('tipos')
+  async getTipos() {
+    return this.produtosService.findAllTipos();
+  }
+
+  /**
    * Busca produtos por descrição
    * GET /produtos?search=termo
    */

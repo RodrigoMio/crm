@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../services/api'
-import { Produto } from '../types/produto'
+import { Produto, ProdutoTipo } from '../types/produto'
 import { toast } from 'react-toastify'
+import ViewAllProductsModal from './ViewAllProductsModal'
 import './ProductTagsInput.css'
 
 interface ProductTagsInputProps {
@@ -9,17 +10,34 @@ interface ProductTagsInputProps {
   onChange: (produtos: number[]) => void
   isAdmin: boolean
   allowCreateNew?: boolean // Permite criar novos produtos (padrão: true se isAdmin, false caso contrário)
+  showViewAllButton?: boolean // Mostra botão "Ver todos" ao lado do label (padrão: false)
+  label?: string // Label do campo (padrão: "Produtos de interesse")
 }
 
-export default function ProductTagsInput({ value, onChange, isAdmin, allowCreateNew }: ProductTagsInputProps) {
+export default function ProductTagsInput({ 
+  value, 
+  onChange, 
+  isAdmin, 
+  allowCreateNew,
+  showViewAllButton = false,
+  label = 'Produtos de interesse'
+}: ProductTagsInputProps) {
   // Se allowCreateNew não for especificado, usa isAdmin como padrão
   const canCreateNew = allowCreateNew !== undefined ? allowCreateNew && isAdmin : isAdmin
+  
+  // Debug: log para verificar se pode criar
+  useEffect(() => {
+    console.log('[ProductTagsInput] canCreateNew:', canCreateNew, 'isAdmin:', isAdmin, 'allowCreateNew:', allowCreateNew)
+  }, [canCreateNew, isAdmin, allowCreateNew])
   const [inputValue, setInputValue] = useState('')
   const [suggestions, setSuggestions] = useState<Produto[]>([])
   const [selectedProdutos, setSelectedProdutos] = useState<Produto[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [loading, setLoading] = useState(false)
   const [creatingNew, setCreatingNew] = useState(false)
+  const [showViewAllModal, setShowViewAllModal] = useState(false)
+  const [produtoTipos, setProdutoTipos] = useState<ProdutoTipo[]>([])
+  const [loadingTipos, setLoadingTipos] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
 
@@ -91,6 +109,63 @@ export default function ProductTagsInput({ value, onChange, isAdmin, allowCreate
     return () => clearTimeout(timeoutId)
   }, [inputValue])
 
+  // Busca tipos de produto ao montar o componente
+  useEffect(() => {
+    const fetchTipos = async () => {
+      if (!canCreateNew) {
+        console.log('[ProductTagsInput] Não pode criar novos produtos, pulando busca de tipos')
+        return // Só busca se pode criar novos produtos
+      }
+      
+      setLoadingTipos(true)
+      try {
+        console.log('[ProductTagsInput] Buscando tipos de produto...')
+        const response = await api.get('/produtos/tipos')
+        console.log('[ProductTagsInput] Resposta completa:', response)
+        console.log('[ProductTagsInput] Resposta data:', response.data)
+        console.log('[ProductTagsInput] Tipo de response.data:', typeof response.data)
+        console.log('[ProductTagsInput] É array?', Array.isArray(response.data))
+        
+        // Tenta extrair os tipos de diferentes formatos possíveis
+        let tipos: ProdutoTipo[] = []
+        if (Array.isArray(response.data)) {
+          tipos = response.data
+        } else if (response.data && Array.isArray(response.data.data)) {
+          tipos = response.data.data
+        } else if (response.data && typeof response.data === 'object') {
+          // Se for um objeto, tenta pegar qualquer propriedade que seja array
+          const keys = Object.keys(response.data)
+          for (const key of keys) {
+            if (Array.isArray(response.data[key])) {
+              tipos = response.data[key]
+              break
+            }
+          }
+        }
+        
+        console.log('[ProductTagsInput] Tipos extraídos:', tipos)
+        console.log('[ProductTagsInput] Quantidade de tipos:', tipos.length)
+        
+        if (tipos.length === 0) {
+          console.warn('[ProductTagsInput] Nenhum tipo encontrado na resposta')
+        }
+        
+        setProdutoTipos(tipos)
+      } catch (error: any) {
+        console.error('[ProductTagsInput] Erro ao buscar tipos de produto:', error)
+        console.error('[ProductTagsInput] Status:', error.response?.status)
+        console.error('[ProductTagsInput] Status text:', error.response?.statusText)
+        console.error('[ProductTagsInput] Erro detalhado:', error.response?.data || error.message)
+        console.error('[ProductTagsInput] Stack:', error.stack)
+        toast.error('Erro ao carregar tipos de produto')
+        setProdutoTipos([])
+      } finally {
+        setLoadingTipos(false)
+      }
+    }
+    fetchTipos()
+  }, [canCreateNew])
+
   // Fecha sugestões ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -158,7 +233,7 @@ export default function ProductTagsInput({ value, onChange, isAdmin, allowCreate
     onChange(value.filter(id => id !== produtoId))
   }
 
-  const handleCreateNew = async () => {
+  const handleCreateNew = async (produtoTipoId?: number) => {
     if (!inputValue.trim()) {
       toast.error('Digite o nome do produto')
       return
@@ -169,10 +244,14 @@ export default function ProductTagsInput({ value, onChange, isAdmin, allowCreate
       return
     }
 
+    // Se não forneceu tipo, usa o primeiro da lista (ou default 1)
+    const tipoId = produtoTipoId || produtoTipos[0]?.produto_tipo_id || 1
+
     setCreatingNew(true)
     try {
       const response = await api.post('/produtos', {
         descricao: inputValue.trim(),
+        produto_tipo_id: tipoId,
       })
       const novoProduto = response.data
       handleSelectProduto(novoProduto)
@@ -185,10 +264,21 @@ export default function ProductTagsInput({ value, onChange, isAdmin, allowCreate
     }
   }
 
+  const handleTipoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const produtoTipoId = parseInt(e.target.value, 10)
+    if (produtoTipoId) {
+      handleCreateNew(produtoTipoId)
+    }
+  }
+
   const hasExactMatch = suggestions.some(
     p => p.descricao.toLowerCase() === inputValue.trim().toLowerCase()
   )
   const showCreateNew = isAdmin && inputValue.trim() && !hasExactMatch && !loading
+
+  const handleViewAllApply = (productIds: number[]) => {
+    onChange(productIds)
+  }
 
   // Remove duplicatas antes de renderizar
   const produtosUnicos = selectedProdutos.filter((produto, index, self) =>
@@ -197,6 +287,18 @@ export default function ProductTagsInput({ value, onChange, isAdmin, allowCreate
 
   return (
     <div className="product-tags-input">
+      {showViewAllButton && (
+        <div className="product-tags-label-row">
+          <label>{label}</label>
+          <button
+            type="button"
+            onClick={() => setShowViewAllModal(true)}
+            className="product-tags-view-all-btn"
+          >
+            Ver todos
+          </button>
+        </div>
+      )}
       <div className="product-tags-container">
         {produtosUnicos.map((produto) => (
           <span key={produto.produto_id} className="product-tag">
@@ -246,15 +348,45 @@ export default function ProductTagsInput({ value, onChange, isAdmin, allowCreate
             </>
           )}
           {showCreateNew && (
-            <div
-              className="product-tags-suggestion-item product-tags-create-new"
-              onClick={handleCreateNew}
-            >
-              {creatingNew ? 'Criando...' : `${inputValue} (+NOVO)`}
+            <div className="product-tags-suggestion-item product-tags-create-new-inline">
+              <span className="product-tags-create-new-text">
+                {creatingNew ? 'Criando...' : inputValue}
+              </span>
+              <select
+                className="product-tags-tipo-select"
+                onChange={handleTipoChange}
+                disabled={creatingNew || loadingTipos}
+                onClick={(e) => e.stopPropagation()}
+                defaultValue=""
+              >
+                <option value="" disabled>
+                  {loadingTipos ? 'Carregando...' : produtoTipos.length === 0 ? 'Nenhum tipo disponível' : 'Selecione o tipo'}
+                </option>
+                {produtoTipos.length > 0 ? (
+                  produtoTipos.map((tipo) => (
+                    <option key={tipo.produto_tipo_id} value={tipo.produto_tipo_id}>
+                      {tipo.descricao}
+                    </option>
+                  ))
+                ) : (
+                  !loadingTipos && (
+                    <option value="" disabled>
+                      Nenhum tipo encontrado
+                    </option>
+                  )
+                )}
+              </select>
             </div>
           )}
         </div>
       )}
+
+      <ViewAllProductsModal
+        isOpen={showViewAllModal}
+        onClose={() => setShowViewAllModal(false)}
+        selectedProductIds={value}
+        onApply={handleViewAllApply}
+      />
     </div>
   )
 }

@@ -245,9 +245,12 @@ export class LeadsService {
       }
     }
 
-    // Filtro por UF
+    // Filtro por UF (aceita string única ou array de strings)
     if (filterDto.uf) {
-      queryBuilder.andWhere('lead.uf = :uf', { uf: filterDto.uf });
+      const ufs = Array.isArray(filterDto.uf) ? filterDto.uf : [filterDto.uf];
+      if (ufs.length > 0) {
+        queryBuilder.andWhere('lead.uf IN (:...ufs)', { ufs });
+      }
     }
 
     // Filtro por vendedor (apenas Admin pode filtrar por outro vendedor)
@@ -420,7 +423,7 @@ export class LeadsService {
     // Busca produtos relacionados
     const leadsProdutos = await this.leadsProdutoRepository.find({
       where: { leads_id: id },
-      relations: ['produto'],
+      relations: ['produto', 'produto.produto_tipo'],
     });
 
     // Adiciona produtos ao lead

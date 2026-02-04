@@ -32,7 +32,7 @@ export class LeadActivitiesService {
           leads_id: leadId,
           active: true,
         },
-        relations: ['ocorrencia', 'produto', 'created_at_usuario'],
+        relations: ['ocorrencia', 'produto', 'produto.produto_tipo', 'created_at_usuario'],
         order: { 
           data: 'DESC',
           created_at: 'DESC',

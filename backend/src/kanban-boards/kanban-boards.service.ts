@@ -6,12 +6,14 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, DataSource } from 'typeorm';
+import * as XLSX from 'xlsx';
 import { KanbanBoard, KanbanBoardType } from './entities/kanban-board.entity';
 import { CreateKanbanBoardDto } from './dto/create-kanban-board.dto';
 import { UpdateKanbanBoardDto } from './dto/update-kanban-board.dto';
 import { FilterKanbanBoardsDto } from './dto/filter-kanban-boards.dto';
 import { FilterLeadsDto } from '../leads/dto/filter-leads.dto';
 import { CreateLeadDto } from '../leads/dto/create-lead.dto';
+import { BulkAddProdutoDto, BulkRemoveProdutoDto } from './dto/bulk-produto.dto';
 import { Lead } from '../leads/entities/lead.entity';
 import { User, UserProfile } from '../users/entities/user.entity';
 import { KanbanModelo } from '../kanban-modelos/entities/kanban-modelo.entity';
@@ -236,14 +238,9 @@ export class KanbanBoardsService {
       boards.map(async (board) => {
         const count = await this.getLeadsCountByBoard(board);
         
-        let corFinal = board.cor_hex;
-        if (board.tipo === KanbanBoardType.COLABORADOR && board.kanbanStatus?.bg_color) {
-          corFinal = board.kanbanStatus.bg_color;
-        }
-        
         return {
           ...board,
-          cor_hex: corFinal,
+          cor_hex: board.cor_hex,
           leads_count: count,
         };
       }),
@@ -721,8 +718,14 @@ export class KanbanBoardsService {
       } else if (board.tipo === KanbanBoardType.COLABORADOR) {
         // Kanban-Colaborador
         if (boardType === 'NOVO') {
-          // Board "NOVO" (agente_id = null)
-          vendedorId = board.agente_id; // Usa valor do board (mesmo que seja null)
+          // Board "NOVO" (nome === 'NOVOS')
+          // Na tela kanban-colaborador, o board "NOVOS" sempre deve ter agente_id definido (agente pai do colaborador)
+          if (!board.agente_id) {
+            throw new BadRequestException(
+              'Board "NOVOS" na tela kanban-colaborador deve ter agente_id definido (agente pai do colaborador)',
+            );
+          }
+          vendedorId = board.agente_id;
           usuarioIdColaborador = board.colaborador_id;
           kanbanStatusId = null;
         } else if (boardType === 'STATUS') {
@@ -753,7 +756,7 @@ export class KanbanBoardsService {
       // Busca produtos relacionados
       const leadsProdutos = await this.leadsProdutoRepository.find({
         where: { leads_id: savedLead.id },
-        relations: ['produto'],
+        relations: ['produto', 'produto.produto_tipo'],
       });
 
       // Adiciona produtos ao lead
@@ -1196,9 +1199,12 @@ export class KanbanBoardsService {
         }
       }
 
-      // Filtro por UF
+      // Filtro por UF (aceita string única ou array de strings)
       if (filterDto.uf) {
-        queryBuilder.andWhere('lead.uf = :uf', { uf: filterDto.uf });
+        const ufs = Array.isArray(filterDto.uf) ? filterDto.uf : [filterDto.uf];
+        if (ufs.length > 0) {
+          queryBuilder.andWhere('lead.uf IN (:...ufs)', { ufs });
+        }
       }
 
       // Filtro por vendedor
@@ -1424,7 +1430,7 @@ export class KanbanBoardsService {
         const leadIds = leads.map(lead => lead.id);
         const leadsProdutos = await this.leadsProdutoRepository.find({
           where: { leads_id: In(leadIds) },
-          relations: ['produto'],
+          relations: ['produto', 'produto.produto_tipo'],
         });
 
         const produtosPorLead = new Map<number, Map<number, any>>();
@@ -1434,6 +1440,12 @@ export class KanbanBoardsService {
           }
           const produtosMap = produtosPorLead.get(lp.leads_id)!;
           if (!produtosMap.has(lp.produto.produto_id)) {
+            // Verifica se produto_tipo está sendo carregado
+            if (!lp.produto.produto_tipo) {
+              console.warn(`[getLeadsByBoard] Produto ${lp.produto.produto_id} (${lp.produto.descricao}) não tem produto_tipo carregado`);
+            } else if (!lp.produto.produto_tipo.bg_color) {
+              console.warn(`[getLeadsByBoard] Produto ${lp.produto.produto_id} (${lp.produto.descricao}) tem produto_tipo mas bg_color está vazio/null`);
+            }
             produtosMap.set(lp.produto.produto_id, lp.produto);
           }
         });
@@ -1540,6 +1552,248 @@ export class KanbanBoardsService {
   }
 
   /**
+   * Exporta leads de um board para Excel
+   */
+  async exportLeadsByBoard(
+    boardId: number,
+    filterDto: FilterLeadsDto,
+    currentUser: User,
+  ): Promise<Buffer> {
+    try {
+      const board = await this.findOne(boardId);
+
+      // Determinar tipo_fluxo do board (com fallback para modelo)
+      let tipoFluxo: TipoFluxo = (board.tipo_fluxo as TipoFluxo) || TipoFluxo.COMPRADOR;
+      
+      if (!board.tipo_fluxo && board.kanban_modelo_id) {
+        const modelo = await this.kanbanModeloRepository.findOne({
+          where: { kanban_modelo_id: board.kanban_modelo_id },
+        });
+        if (modelo?.tipo_fluxo) {
+          tipoFluxo = modelo.tipo_fluxo as TipoFluxo;
+        }
+      }
+      
+      const tipoFluxoString = typeof tipoFluxo === 'string' ? tipoFluxo : String(tipoFluxo);
+      const tipoFluxoClean = tipoFluxoString.replace(/[{}]/g, '').trim();
+
+      const queryBuilder = this.leadsRepository.createQueryBuilder('lead');
+
+      // Aplica filtros conforme o tipo de board (mesma lógica do getLeadsByBoard)
+      if (board.tipo === KanbanBoardType.ADMIN) {
+        if (board.nome === 'NOVOS') {
+          const tipoFluxoEscaped = tipoFluxoClean.replace(/'/g, "''");
+          queryBuilder.leftJoin(
+            'lead_kanban_status',
+            'lks',
+            `lks.lead_id = lead.id AND lks.tipo_fluxo = '${tipoFluxoEscaped}'`
+          );
+          queryBuilder.andWhere(
+            '(lks.lead_id IS NULL OR lks.vendedor_id IS NULL)'
+          );
+        } else {
+          const tipoFluxoEscaped = tipoFluxoClean.replace(/'/g, "''");
+          queryBuilder.innerJoin(
+            'lead_kanban_status',
+            'lks',
+            `lks.lead_id = lead.id AND lks.tipo_fluxo = '${tipoFluxoEscaped}'`
+          );
+          if (board.agente_id) {
+            const agenteId = this.normalizeId(board.agente_id);
+            queryBuilder.andWhere('lks.vendedor_id = :agente_id', {
+              agente_id: agenteId,
+            });
+          }
+        }
+      } else if (board.tipo === KanbanBoardType.AGENTE) {
+        queryBuilder.innerJoin(
+          'lead_kanban_status',
+          'lks',
+          'lks.lead_id = lead.id AND lks.tipo_fluxo = :tipo_fluxo',
+          { tipo_fluxo: tipoFluxoClean }
+        );
+        
+        if (board.nome === 'NOVOS') {
+          if (board.agente_id) {
+            queryBuilder.andWhere('lks.vendedor_id = :agente_id', {
+              agente_id: board.agente_id,
+            });
+            queryBuilder.andWhere('lks.usuario_id_colaborador IS NULL');
+          }
+        } else {
+          if (board.colaborador_id) {
+            queryBuilder.andWhere('lks.usuario_id_colaborador = :colaborador_id', {
+              colaborador_id: board.colaborador_id,
+            });
+          }
+        }
+      } else if (board.tipo === KanbanBoardType.COLABORADOR) {
+        const tipoFluxoEscaped = tipoFluxoClean.replace(/'/g, "''");
+        queryBuilder.innerJoin(
+          'lead_kanban_status',
+          'lks',
+          `lks.lead_id = lead.id AND lks.tipo_fluxo = '${tipoFluxoEscaped}'`
+        );
+        
+        if (board.nome === 'NOVOS') {
+          if (board.colaborador_id) {
+            queryBuilder.andWhere('lks.usuario_id_colaborador = :colaborador_id', {
+              colaborador_id: board.colaborador_id,
+            });
+            queryBuilder.andWhere('lks.kanban_status_id IS NULL');
+          }
+        } else {
+          if (board.kanban_status_id && board.colaborador_id) {
+            queryBuilder.andWhere('lks.kanban_status_id = :kanban_status_id', {
+              kanban_status_id: board.kanban_status_id,
+            });
+            queryBuilder.andWhere('lks.usuario_id_colaborador = :colaborador_id', {
+              colaborador_id: board.colaborador_id,
+            });
+          }
+        }
+      }
+
+      // Filtro por tipo_lead para boards ADMIN
+      if (board.tipo === KanbanBoardType.ADMIN) {
+        queryBuilder.andWhere(':tipoFluxo = ANY(lead.tipo_lead)', { tipoFluxo: tipoFluxoClean });
+      }
+
+      // Aplica filtros adicionais (mesma lógica do getLeadsByBoard)
+      if (filterDto.nome_razao_social) {
+        const fromChars = 'áàâãäéèêëíìîïóòôõöúùûüçñýÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑÝ';
+        const toChars = 'aaaaaeeeeiiiiooooouuuucnyAAAAAEEEEIIIIOOOOOUUUUCNY';
+        
+        queryBuilder.andWhere(
+          `(
+            translate(LOWER(lead.nome_razao_social), :fromChars, :toChars) ILIKE translate(LOWER(:nome), :fromChars, :toChars)
+            OR 
+            translate(LOWER(lead.nome_fantasia_apelido), :fromChars, :toChars) ILIKE translate(LOWER(:nome), :fromChars, :toChars)
+          )`,
+          { 
+            nome: `%${filterDto.nome_razao_social.trim()}%`,
+            fromChars,
+            toChars
+          }
+        );
+      }
+
+      if (filterDto.email) {
+        queryBuilder.andWhere(
+          'LOWER(lead.email) ILIKE LOWER(:email)',
+          { email: `%${filterDto.email.trim()}%` }
+        );
+      }
+
+      if (filterDto.telefone) {
+        const telefoneNumeros = filterDto.telefone.trim().replace(/\D/g, '');
+        if (telefoneNumeros) {
+          queryBuilder.andWhere(
+            `REGEXP_REPLACE(lead.telefone, '[^0-9]', '', 'g') ILIKE :telefone`,
+            { telefone: `%${telefoneNumeros}%` }
+          );
+        }
+      }
+
+      if (filterDto.uf) {
+        const ufs = Array.isArray(filterDto.uf) ? filterDto.uf : [filterDto.uf];
+        if (ufs.length > 0) {
+          queryBuilder.andWhere('lead.uf IN (:...ufs)', { ufs });
+        }
+      }
+
+      if (filterDto.vendedor_id) {
+        if (currentUser.perfil === UserProfile.AGENTE) {
+          const currentUserId = this.normalizeId(currentUser.id);
+          const vendedorId = this.normalizeId(filterDto.vendedor_id);
+          if (vendedorId !== currentUserId) {
+            throw new ForbiddenException('Agente não pode filtrar por outro vendedor');
+          }
+        }
+        const vendedorId = this.normalizeId(filterDto.vendedor_id);
+        if (board.tipo === KanbanBoardType.ADMIN && board.nome === 'NOVOS') {
+          queryBuilder.andWhere('lks.lead_id IS NOT NULL AND lks.vendedor_id = :vendedorId', { vendedorId });
+        } else {
+          queryBuilder.andWhere('lks.vendedor_id = :vendedorId', { vendedorId });
+        }
+      }
+
+      if (filterDto.usuario_id_colaborador) {
+        if (currentUser.perfil === UserProfile.AGENTE) {
+          const colaborador = await this.usersRepository.findOne({
+            where: { id: filterDto.usuario_id_colaborador },
+          });
+          const currentUserId = this.normalizeId(currentUser.id);
+          const colaboradorPaiId = colaborador?.usuario_id_pai ? this.normalizeId(colaborador.usuario_id_pai) : null;
+          if (!colaborador || colaboradorPaiId !== currentUserId) {
+            throw new ForbiddenException('Agente só pode filtrar por seus próprios colaboradores');
+          }
+        }
+        if (currentUser.perfil === UserProfile.COLABORADOR) {
+          const currentUserId = this.normalizeId(currentUser.id);
+          const colaboradorId = this.normalizeId(filterDto.usuario_id_colaborador);
+          if (colaboradorId !== currentUserId) {
+            throw new ForbiddenException('Colaborador só pode ver seus próprios leads');
+          }
+        }
+        const colaboradorId = this.normalizeId(filterDto.usuario_id_colaborador);
+        if (board.tipo === KanbanBoardType.ADMIN && board.nome === 'NOVOS') {
+          queryBuilder.andWhere('lks.lead_id IS NOT NULL AND lks.usuario_id_colaborador = :colaboradorId', { 
+            colaboradorId
+          });
+        } else {
+          queryBuilder.andWhere('lks.usuario_id_colaborador = :colaboradorId', { 
+            colaboradorId
+          });
+        }
+      }
+
+      if (filterDto.origem_lead) {
+        queryBuilder.andWhere('lead.origem_lead = :origemLead', { origemLead: filterDto.origem_lead });
+      }
+
+      if (filterDto.produtos && filterDto.produtos.length > 0) {
+        queryBuilder.andWhere(
+          `EXISTS (SELECT 1 FROM leads_produto WHERE leads_produto.leads_id = lead.id AND leads_produto.produto_id IN (:...produtoIds))`,
+          {
+            produtoIds: filterDto.produtos,
+          }
+        );
+      }
+
+      // Ordenação
+      queryBuilder.orderBy('lead.created_at', 'DESC');
+
+      // Busca TODOS os leads (sem paginação)
+      const leads = await queryBuilder.getMany();
+
+      // Prepara dados para Excel
+      const excelData = leads.map(lead => ({
+        'Nome/Razão Social': lead.nome_razao_social || '',
+        'Nome Fantasia': lead.nome_fantasia_apelido || '',
+        'Telefone': lead.telefone || '',
+        'Email': lead.email || '',
+      }));
+
+      // Cria workbook
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Leads');
+
+      // Gera buffer do arquivo
+      const excelBuffer = XLSX.write(workbook, { 
+        type: 'buffer', 
+        bookType: 'xlsx' 
+      });
+
+      return excelBuffer;
+    } catch (error) {
+      console.error('[exportLeadsByBoard] Erro ao exportar leads:', error);
+      throw new BadRequestException(`Erro ao exportar leads: ${error.message || 'Erro desconhecido'}`);
+    }
+  }
+
+  /**
    * Atualiza ordem dos boards
    */
   async updateOrder(
@@ -1558,5 +1812,106 @@ export class KanbanBoardsService {
     }
 
     return await this.kanbanBoardRepository.save(boards);
+  }
+
+  /**
+   * Adiciona produto (tag) para todos os leads visíveis de um board
+   * Verifica duplicatas antes de adicionar
+   */
+  async bulkAddProduto(
+    boardId: number,
+    bulkAddProdutoDto: BulkAddProdutoDto,
+    filterDto: FilterLeadsDto,
+    currentUser: User,
+  ): Promise<{ affected: number; total: number }> {
+    // Busca todos os leads visíveis do board (sem paginação)
+    const allLeadsResult = await this.getLeadsByBoard(
+      boardId,
+      { ...filterDto, page: 1, limit: 10000 }, // Limite alto para pegar todos
+      currentUser,
+    );
+
+    const leads = allLeadsResult.data;
+    const leadIds = leads.map(lead => lead.id);
+
+    if (leadIds.length === 0) {
+      return { affected: 0, total: 0 };
+    }
+
+    // Busca produtos já existentes para esses leads
+    const produtosExistentes = await this.leadsProdutoRepository.find({
+      where: {
+        leads_id: In(leadIds),
+        produto_id: bulkAddProdutoDto.produto_id,
+      },
+    });
+
+    const leadsComProduto = new Set(produtosExistentes.map(p => p.leads_id));
+    
+    // Filtra leads que ainda não têm o produto
+    const leadsParaAdicionar = leadIds.filter(leadId => !leadsComProduto.has(leadId));
+
+    if (leadsParaAdicionar.length === 0) {
+      return { affected: 0, total: leads.length };
+    }
+
+    // Valida se o produto existe
+    const produto = await this.produtoRepository.findOne({
+      where: { produto_id: bulkAddProdutoDto.produto_id },
+    });
+
+    if (!produto) {
+      throw new BadRequestException(`Produto com ID ${bulkAddProdutoDto.produto_id} não encontrado`);
+    }
+
+    // Cria relacionamentos para leads que não têm o produto
+    const novosRelacionamentos = leadsParaAdicionar.map(leadId =>
+      this.leadsProdutoRepository.create({
+        leads_id: leadId,
+        produto_id: bulkAddProdutoDto.produto_id,
+      })
+    );
+
+    await this.leadsProdutoRepository.save(novosRelacionamentos);
+
+    return {
+      affected: novosRelacionamentos.length,
+      total: leads.length,
+    };
+  }
+
+  /**
+   * Remove produto (tag) de todos os leads visíveis de um board
+   */
+  async bulkRemoveProduto(
+    boardId: number,
+    bulkRemoveProdutoDto: BulkRemoveProdutoDto,
+    filterDto: FilterLeadsDto,
+    currentUser: User,
+  ): Promise<{ affected: number; total: number }> {
+    // Busca todos os leads visíveis do board (sem paginação)
+    const allLeadsResult = await this.getLeadsByBoard(
+      boardId,
+      { ...filterDto, page: 1, limit: 10000 }, // Limite alto para pegar todos
+      currentUser,
+    );
+
+    const leads = allLeadsResult.data;
+    const leadIds = leads.map(lead => lead.id);
+
+    if (leadIds.length === 0) {
+      return { affected: 0, total: 0 };
+    }
+
+    // Remove produto de todos os leads visíveis (DELETE direto)
+    const result = await this.leadsProdutoRepository.delete({
+      leads_id: In(leadIds),
+      produto_id: bulkRemoveProdutoDto.produto_id,
+    });
+
+    return {
+      affected: result.affected || 0,
+      total: leads.length,
+    };
   }
 }

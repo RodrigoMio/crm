@@ -284,6 +284,16 @@ export default function EditLeadModal({
           />
         </div>
 
+        <div>
+          <label>Nome Fantasia/Apelido</label>
+          <input
+            type="text"
+            value={formData.nome_fantasia_apelido || ''}
+            onChange={(e) => setFormData({ ...formData, nome_fantasia_apelido: e.target.value })}
+            style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
+          />
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <div>
             <label>Telefone</label>
@@ -443,12 +453,13 @@ export default function EditLeadModal({
         </div>
 
         <div>
-          <label>Produtos de interesse</label>
           <div style={{ marginTop: '0.25rem' }}>
             <ProductTagsInput
               value={formData.produtos || []}
               onChange={(produtos) => setFormData({ ...formData, produtos })}
               isAdmin={user?.perfil === 'ADMIN'}
+              showViewAllButton={true}
+              label="Produtos de interesse"
             />
           </div>
         </div>
