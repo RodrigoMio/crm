@@ -11,6 +11,7 @@ import { AppointmentsModule } from './appointments/appointments.module';
 import { ProdutosModule } from './produtos/produtos.module';
 import { LeadActivitiesModule } from './lead-activities/lead-activities.module';
 import { OcorrenciasModule } from './ocorrencias/ocorrencias.module';
+import { LandingPagesModule } from './landing-pages/landing-pages.module';
 import { DatabaseConfig } from './config/database.config';
 
 @Module({
@@ -32,6 +33,7 @@ import { DatabaseConfig } from './config/database.config';
     ProdutosModule,
     LeadActivitiesModule,
     OcorrenciasModule,
+    LandingPagesModule,
   ],
 })
 export class AppModule {}

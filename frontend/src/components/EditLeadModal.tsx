@@ -460,6 +460,8 @@ export default function EditLeadModal({
               isAdmin={user?.perfil === 'ADMIN'}
               showViewAllButton={true}
               label="Produtos de interesse"
+              lockedIds={(leadWithProducts?.produtos || []).filter((p: any) => p.insert_by_lead).map((p: any) => p.produto_id)}
+              lockedTooltip="Produto selecionado pelo Lead na Landing Page. Remoção desabilitada."
             />
           </div>
         </div>

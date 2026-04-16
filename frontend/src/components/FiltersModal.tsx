@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { FilterLeadsDto, OrigemLead } from '../types/lead'
 import ProductTagsInput from './ProductTagsInput'
 import UFTagsInput from './UFTagsInput'
+import { api } from '../services/api'
 import './FiltersModal.css'
 
 interface FiltersModalProps {
@@ -30,6 +31,7 @@ export default function FiltersModal({
   isAgente,
 }: FiltersModalProps) {
   const [localFilters, setLocalFilters] = useState<FilterLeadsDto>(filters)
+  const [origemOptions, setOrigemOptions] = useState<string[]>(Object.values(OrigemLead))
 
   // Sincroniza filtros locais quando os filtros externos mudam (especialmente ao abrir o modal)
   useEffect(() => {
@@ -37,6 +39,34 @@ export default function FiltersModal({
       setLocalFilters(filters)
     }
   }, [isOpen, filters])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const loadOrigens = async () => {
+      try {
+        const response = await api.get('/leads/origens')
+        const fromApi = Array.isArray(response.data) ? response.data : []
+        const merged = [...Object.values(OrigemLead), ...fromApi]
+        const unique = Array.from(new Set(merged.map((item) => String(item).trim()).filter(Boolean)))
+        setOrigemOptions(unique)
+      } catch {
+        setOrigemOptions(Object.values(OrigemLead))
+      }
+    }
+
+    loadOrigens()
+  }, [isOpen])
+
+  const formatOrigemLabel = (origem: string) => {
+    if (origem.includes('_')) {
+      return origem
+        .split('_')
+        .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
+        .join(' ')
+    }
+    return origem
+  }
 
   const handleFilterChange = (updates: Partial<FilterLeadsDto>) => {
     setLocalFilters((prev) => ({ ...prev, ...updates }))
@@ -112,9 +142,9 @@ export default function FiltersModal({
               }
             >
               <option value="">Todas</option>
-              {Object.values(OrigemLead).map((origem) => (
+              {origemOptions.map((origem) => (
                 <option key={origem} value={origem}>
-                  {origem.split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ')}
+                  {formatOrigemLabel(origem)}
                 </option>
               ))}
             </select>

@@ -12,6 +12,9 @@ interface ProductTagsInputProps {
   allowCreateNew?: boolean // Permite criar novos produtos (padrão: true se isAdmin, false caso contrário)
   showViewAllButton?: boolean // Mostra botão "Ver todos" ao lado do label (padrão: false)
   label?: string // Label do campo (padrão: "Produtos de interesse")
+  filterProdutoTipoId?: number // Quando definido, filtra sugestões e carregamentos por tipo
+  lockedIds?: number[] // IDs bloqueados (não permitem remoção)
+  lockedTooltip?: string // Tooltip exibido quando bloqueado
 }
 
 export default function ProductTagsInput({ 
@@ -20,7 +23,10 @@ export default function ProductTagsInput({
   isAdmin, 
   allowCreateNew,
   showViewAllButton = false,
-  label = 'Produtos de interesse'
+  label = 'Produtos de interesse',
+  filterProdutoTipoId,
+  lockedIds = [],
+  lockedTooltip = 'Produto selecionado pelo Lead na Landing Page. Remoção desabilitada.'
 }: ProductTagsInputProps) {
   // Se allowCreateNew não for especificado, usa isAdmin como padrão
   const canCreateNew = allowCreateNew !== undefined ? allowCreateNew && isAdmin : isAdmin
@@ -67,7 +73,10 @@ export default function ProductTagsInput({
         try {
           // Busca todos os produtos (sem filtro de busca para pegar todos)
           const response = await api.get('/produtos?search=')
-          const allProdutos = response.data || []
+          let allProdutos: Produto[] = response.data || []
+          if (filterProdutoTipoId) {
+            allProdutos = allProdutos.filter((p: Produto) => Number(p.produto_tipo_id) === Number(filterProdutoTipoId))
+          }
           
           // Filtra pelos IDs que precisamos
           const novosProdutos = allProdutos.filter((p: Produto) =>
@@ -192,7 +201,10 @@ export default function ProductTagsInput({
     setLoading(true)
     try {
       const response = await api.get(`/produtos?search=${encodeURIComponent(searchTerm)}`)
-      const produtos = response.data || []
+      let produtos: Produto[] = response.data || []
+      if (filterProdutoTipoId) {
+        produtos = produtos.filter((p: Produto) => Number(p.produto_tipo_id) === Number(filterProdutoTipoId))
+      }
       
       // Filtra produtos já selecionados
       const produtosDisponiveis = produtos.filter(
@@ -303,14 +315,27 @@ export default function ProductTagsInput({
         {produtosUnicos.map((produto) => (
           <span key={produto.produto_id} className="product-tag">
             {produto.descricao}
-            <button
-              type="button"
-              onClick={() => handleRemoveProduto(produto.produto_id)}
-              className="product-tag-remove"
-              aria-label={`Remover ${produto.descricao}`}
-            >
-              ×
-            </button>
+            {!lockedIds.includes(produto.produto_id) ? (
+              <button
+                type="button"
+                onClick={() => handleRemoveProduto(produto.produto_id)}
+                className="product-tag-remove"
+                aria-label={`Remover ${produto.descricao}`}
+              >
+                ×
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="product-tag-remove"
+                aria-label={`Remoção desabilitada para ${produto.descricao}`}
+                title={lockedTooltip}
+                disabled
+                style={{ opacity: 0.4, cursor: 'not-allowed' }}
+              >
+                ×
+              </button>
+            )}
           </span>
         ))}
         <input

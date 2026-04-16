@@ -71,6 +71,15 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
+    // Verifica se é erro 403 relacionado a permissões de lead
+    // Esses erros são tratados silenciosamente nos componentes
+    const is403Forbidden = error.response?.status === 403
+    const isLeadPermissionError = is403Forbidden && (
+      error.config?.url?.includes('/leads/') ||
+      error.response?.data?.message?.includes('permissão para ver este lead') ||
+      error.response?.data?.message?.includes('permissão para ver')
+    )
+
     // Exibe mensagem de erro amigável
     let errorMessage = 'Ocorreu um erro inesperado. Por favor, tente novamente.'
     
@@ -85,8 +94,10 @@ api.interceptors.response.use(
       errorMessage = error.message
     }
     
-    // Não exibe toast para erros 401 (já redireciona para login)
-    if (error.response?.status !== 401) {
+    // Não exibe toast para:
+    // - Erros 401 (já redireciona para login)
+    // - Erros 403 relacionados a permissões de lead (tratados silenciosamente nos componentes)
+    if (error.response?.status !== 401 && !isLeadPermissionError) {
       toast.error(errorMessage, {
         position: 'top-right',
         autoClose: 5000,

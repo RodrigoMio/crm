@@ -26,6 +26,9 @@ export class LeadsProduto {
   @ManyToOne(() => Produto)
   @JoinColumn({ name: 'produto_id' })
   produto: Produto;
+
+  @Column({ type: 'boolean', name: 'insert_by_lead', default: false })
+  insert_by_lead: boolean;
 }
 
 

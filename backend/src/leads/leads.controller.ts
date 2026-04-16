@@ -83,6 +83,14 @@ export class LeadsController {
   }
 
   /**
+   * Lista origens disponíveis para o filtro (inclui valores dinâmicos como slug de LP)
+   */
+  @Get('origens')
+  findAvailableOrigens(@Request() req) {
+    return this.leadsService.findAvailableOrigens(req.user);
+  }
+
+  /**
    * Busca um lead por ID
    * Admin pode ver qualquer lead
    * Agente só pode ver os seus

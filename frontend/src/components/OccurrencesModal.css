@@ -90,6 +90,58 @@
   min-height: 400px;
 }
 
+.lead-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background: linear-gradient(180deg, #fafcff 0%, #ffffff 100%);
+  border: 1px solid #e8eef5;
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.lead-edit-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.lead-edit-grid-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.lead-edit-grid-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.lead-edit-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.lead-edit-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d8e2ee;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background-color: #fff;
+}
+
+.lead-edit-input:focus {
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
+}
+
+.lead-edit-input-readonly {
+  background-color: #f5f8fc;
+  color: #4f5d70;
+  cursor: not-allowed;
+}
+
 .occurrences-form {
   margin-bottom: 2rem;
   padding: 0.5rem;
@@ -153,6 +205,11 @@
 
   .occurrences-tab-content {
     min-height: 300px;
+  }
+
+  .lead-edit-grid-2,
+  .lead-edit-grid-3 {
+    grid-template-columns: 1fr;
   }
 
   /* Formulário de atividades em mobile */

@@ -48,7 +48,8 @@ export interface Lead {
   uf?: string
   municipio?: string
   anotacoes?: string
-  origem_lead?: OrigemLead
+  origem_lead?: OrigemLead | string
+  lead_msg_interesse?: string
   vendedor_id: string
   vendedor?: {
     id: string
@@ -71,6 +72,7 @@ export interface Lead {
   total_conversoes?: number
   tipo_lead?: string[]
   produtos?: Produto[]
+  ultima_ocorrencia_date?: string | null
   created_at: string
   updated_at: string
 }
@@ -84,7 +86,7 @@ export interface CreateLeadDto {
   uf?: string
   municipio?: string
   anotacoes?: string
-  origem_lead?: OrigemLead
+  origem_lead?: OrigemLead | string
   vendedor_id?: string
   usuario_id_colaborador?: number
   tipo_lead?: string[]
@@ -98,7 +100,7 @@ export interface FilterLeadsDto {
   uf?: string | string[] // Aceita string (compatibilidade) ou array de strings
   vendedor_id?: string
   usuario_id_colaborador?: number
-  origem_lead?: OrigemLead
+  origem_lead?: OrigemLead | string
   produtos?: number[]
   tipo_lead?: string
 }

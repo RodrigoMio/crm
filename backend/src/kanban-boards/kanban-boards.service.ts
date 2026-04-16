@@ -1456,6 +1456,36 @@ export class KanbanBoardsService {
         });
       }
 
+      // Carrega última ocorrência para todos os leads de uma vez
+      if (leads.length > 0) {
+        const leadIds = leads.map(lead => lead.id);
+        
+        try {
+          const lastOccurrences = await this.occurrencesRepository
+            .createQueryBuilder('occ')
+            .select('occ.leads_id', 'lead_id')
+            .addSelect('MAX(occ.created_at)', 'last_occurrence_date')
+            .where('occ.leads_id IN (:...leadIds)', { leadIds })
+            .groupBy('occ.leads_id')
+            .getRawMany();
+          
+          const occurrencesMap = new Map<number, Date>();
+          lastOccurrences.forEach((occ: any) => {
+            occurrencesMap.set(occ.lead_id, occ.last_occurrence_date);
+          });
+          
+          leads.forEach(lead => {
+            (lead as any).ultima_ocorrencia_date = occurrencesMap.get(lead.id) || null;
+          });
+        } catch (error) {
+          console.error('[getLeadsByBoard] Erro ao carregar últimas ocorrências:', error);
+          // Continua sem as datas de ocorrência se houver erro
+          leads.forEach(lead => {
+            (lead as any).ultima_ocorrencia_date = null;
+          });
+        }
+      }
+
       // Debug: Log do que está sendo retornado
       console.log('[getLeadsByBoard] Retornando resposta:');
       console.log('[getLeadsByBoard]   - Total:', total);

@@ -257,6 +257,9 @@ export default function LeadsList() {
       if (filters.usuario_id_colaborador) {
         params.append('usuario_id_colaborador', filters.usuario_id_colaborador.toString())
       }
+      if (filters.origem_lead) {
+        params.append('origem_lead', filters.origem_lead)
+      }
       if (filters.produtos && filters.produtos.length > 0) {
         filters.produtos.forEach(produtoId => {
           params.append('produtos', produtoId.toString())

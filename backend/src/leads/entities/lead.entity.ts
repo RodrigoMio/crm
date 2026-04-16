@@ -70,6 +70,21 @@ export class Lead {
   @Column({ type: 'varchar', length: 255, nullable: true })
   email: string;
 
+  @Column({ type: 'text', nullable: true })
+  lead_msg_interesse: string;
+
+  @Column({ type: 'boolean', default: false })
+  lgpd_aceite: boolean;
+
+  @Column({ type: 'timestamp', nullable: true, precision: 6 })
+  lgpd_data_aceite: Date;
+
+  @Column({ type: 'varchar', nullable: true, length: 45 })
+  lgpd_ip_origem: string;
+
+  @Column({ type: 'text', nullable: true })
+  lgpd_versao_texto: string;
+
   @Column({ type: 'varchar', length: 2, nullable: true })
   uf: string;
 
@@ -80,12 +95,8 @@ export class Lead {
   anotacoes: string;
 
   // Origem é único (single select)
-  @Column({
-    type: 'enum',
-    enum: OrigemLead,
-    nullable: true,
-  })
-  origem_lead: OrigemLead;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  origem_lead: string;
 
   // Vendedor referencia um usuário Agente (pode ser NULL para board "Novos")
   @Column({ type: 'integer', nullable: true })

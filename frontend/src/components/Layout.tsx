@@ -83,6 +83,9 @@ export default function Layout() {
                 Colaboradores
               </Link>
             )}
+            <Link to="/landing-pages" className="nav-link" onClick={closeMobileMenu}>
+              Landing Pages
+            </Link>
             <Link to="/kanban-agente" className="nav-link" onClick={closeMobileMenu}>
               Kanban (A)
             </Link>
@@ -93,9 +96,11 @@ export default function Layout() {
             Funil
           </Link>
         )}
-        <Link to="/kanban-modelos" className="nav-link" onClick={closeMobileMenu}>
-          Modelos de Kanban
-        </Link>
+        {(user?.perfil === 'ADMIN' || user?.perfil === 'AGENTE') && (
+          <Link to="/kanban-modelos" className="nav-link" onClick={closeMobileMenu}>
+            Modelos de Kanban
+          </Link>
+        )}
         <Link to="/agenda" className="nav-link" onClick={closeMobileMenu}>
           Agenda
         </Link>

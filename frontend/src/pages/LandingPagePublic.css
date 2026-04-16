@@ -1,0 +1,164 @@
+.lp-public-wrapper {
+  min-height: 100vh;
+  padding: 20px 14px 28px;
+}
+
+.lp-public-content {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lp-public-title {
+  margin: 6px 0 2px;
+  text-align: center;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.lp-public-subtitle {
+  margin: 0 0 10px;
+  text-align: center;
+  opacity: 0.95;
+  line-height: 1.45;
+}
+
+.lp-public-form {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(2px);
+}
+
+.lp-public-form input,
+.lp-public-form textarea {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 15px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.lp-public-form input::placeholder,
+.lp-public-form textarea::placeholder {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.lp-public-form input:focus,
+.lp-public-form textarea:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+}
+
+.lp-public-form textarea {
+  min-height: 100px;
+}
+
+.lp-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.lp-public-form button {
+  border: 0;
+  border-radius: 10px;
+  padding: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+/* Ajuste de especificidade: garantir borda nos chips mesmo dentro do form */
+.lp-public-form button.lp-chip {
+  border: 1px solid gray;
+  border-radius: 999px;
+}
+
+.lp-public-form button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.lp-public-form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.lp-success h2 {
+  margin-bottom: 8px;
+}
+
+.lp-error {
+  color: #ffd5d2;
+  font-weight: 600;
+}
+
+.lp-public-location {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 140px;
+}
+
+.lp-public-location select {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 15px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.lp-public-products {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lp-public-products .lp-products-title {
+  font-weight: 600;
+}
+
+.lp-public-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px; /* maior espaçamento entre produtos */
+}
+
+.lp-chip {
+  border: 1px solid gray; /* borda padrão cinza */
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.lp-chip.active {
+  font-weight: 700; /* selecionado em bold */
+}
+
+@media (min-width: 768px) {
+  .lp-public-wrapper {
+    padding: 36px 20px 40px;
+  }
+
+  .lp-public-form {
+    padding: 20px;
+  }
+
+  .lp-public-title {
+    margin-top: 12px;
+  }
+}
+

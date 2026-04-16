@@ -15,6 +15,8 @@ import { KanbanModeloStatus } from '../kanban-modelos/entities/kanban-modelo-sta
 import { KanbanStatus } from '../kanban-modelos/entities/kanban-status.entity';
 import { Occurrence } from '../occurrences/entities/occurrence.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
+import { LandingPage } from '../landing-pages/entities/landing-page.entity';
+import { LandingPageProduto } from '../landing-pages/entities/landing-page-produto.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -56,6 +58,8 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         KanbanStatus,
         Occurrence,
         Appointment,
+        LandingPage,
+        LandingPageProduto,
       ],
       synchronize: false, // Desabilitado - alterações no banco devem ser feitas manualmente
       logging: this.getEnv('NODE_ENV', 'development') === 'development',

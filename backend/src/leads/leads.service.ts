@@ -133,6 +133,51 @@ export class LeadsService {
   }
 
   /**
+   * Retorna lista de origens únicas para preenchimento do filtro de origem.
+   * Respeita as regras de visibilidade do usuário.
+   */
+  async findAvailableOrigens(currentUser: User): Promise<string[]> {
+    const queryBuilder = this.leadsRepository
+      .createQueryBuilder('lead')
+      .select('DISTINCT lead.origem_lead', 'origem_lead')
+      .where('lead.origem_lead IS NOT NULL')
+      .andWhere(`TRIM(lead.origem_lead) <> ''`);
+
+    const userPerfil = String(currentUser.perfil).toUpperCase();
+
+    if (userPerfil === UserProfile.AGENTE) {
+      const userId = this.normalizeId(currentUser.id);
+      const colaboradoresDoAgente = await this.usersRepository.find({
+        where: {
+          usuario_id_pai: userId,
+          perfil: UserProfile.COLABORADOR,
+        },
+        select: ['id'],
+      });
+      const idsColaboradores = colaboradoresDoAgente.map((c) => this.normalizeId(c.id));
+
+      if (idsColaboradores.length > 0) {
+        queryBuilder.andWhere(
+          '(lead.vendedor_id = :userId OR lead.usuario_id_colaborador IN (:...colaboradorIds))',
+          { userId, colaboradorIds: idsColaboradores },
+        );
+      } else {
+        queryBuilder.andWhere('lead.vendedor_id = :userId', { userId });
+      }
+    } else if (userPerfil === UserProfile.COLABORADOR) {
+      const userId = this.normalizeId(currentUser.id);
+      queryBuilder.andWhere('lead.usuario_id_colaborador = :userId', { userId });
+    } else if (userPerfil !== UserProfile.ADMIN) {
+      queryBuilder.andWhere('1 = 0');
+    }
+
+    const rows = await queryBuilder.orderBy('lead.origem_lead', 'ASC').getRawMany();
+    return rows
+      .map((row) => String(row.origem_lead || '').trim())
+      .filter(Boolean);
+  }
+
+  /**
    * Lista leads com filtros e paginação
    * Regras de visibilidade:
    * - Admin vê todos os leads
@@ -380,7 +425,9 @@ export class LeadsService {
    * Regras de visibilidade:
    * - Admin pode ver qualquer lead
    * - Agente pode ver seus próprios leads E leads de seus colaboradores
-   * - Colaborador só pode ver leads atribuídos a ele
+   * - Colaborador só pode ver leads atribuídos a ele (campo leads.usuario_id_colaborador)
+   *   ou leads em que ele aparece no Kanban (lead_kanban_status.usuario_id_colaborador),
+   *   pois a movimentação no Kanban atualiza apenas lead_kanban_status
    */
   async findOne(id: number, currentUser: User): Promise<Lead> {
     const lead = await this.leadsRepository.findOne({
@@ -412,22 +459,30 @@ export class LeadsService {
         }
       }
     } else if (currentUser.perfil === UserProfile.COLABORADOR) {
-      // Colaborador só vê leads atribuídos a ele
       const leadColaboradorId = lead.usuario_id_colaborador ? this.normalizeId(lead.usuario_id_colaborador) : null;
       if (leadColaboradorId !== currentUserId) {
-        throw new ForbiddenException('Você não tem permissão para ver este lead');
+        const lksRows = await this.dataSource.query(
+          `SELECT 1 FROM lead_kanban_status WHERE lead_id = $1 AND usuario_id_colaborador = $2 LIMIT 1`,
+          [id, currentUserId],
+        );
+        if (!lksRows?.length) {
+          throw new ForbiddenException('Você não tem permissão para ver este lead');
+        }
       }
     }
     // Admin pode ver tudo (não precisa verificar)
 
-    // Busca produtos relacionados
+    // Busca produtos relacionados incluindo flag insert_by_lead
     const leadsProdutos = await this.leadsProdutoRepository.find({
       where: { leads_id: id },
       relations: ['produto', 'produto.produto_tipo'],
     });
 
-    // Adiciona produtos ao lead
-    (lead as any).produtos = leadsProdutos.map(lp => lp.produto);
+    // Adiciona produtos ao lead, propagando insert_by_lead
+    (lead as any).produtos = leadsProdutos.map(lp => ({
+      ...lp.produto,
+      insert_by_lead: !!lp.insert_by_lead,
+    }));
 
     return lead;
   }

@@ -2,7 +2,6 @@ import {
   IsString,
   IsEmail,
   IsOptional,
-  IsEnum,
   IsInt,
   IsDateString,
   IsArray,
@@ -10,7 +9,6 @@ import {
   Length,
   ValidateIf,
 } from 'class-validator';
-import { OrigemLead } from '../entities/lead.entity';
 
 export class CreateLeadDto {
   @IsOptional()
@@ -48,8 +46,8 @@ export class CreateLeadDto {
   anotacoes?: string;
 
   @IsOptional()
-  @IsEnum(OrigemLead)
-  origem_lead?: OrigemLead;
+  @IsString()
+  origem_lead?: string;
 
   @IsOptional()
   @IsInt()

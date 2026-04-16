@@ -10,6 +10,8 @@ import KanbanAdmin from './pages/KanbanAdmin'
 import KanbanAgente from './pages/KanbanAgente'
 import KanbanColaborador from './pages/KanbanColaborador'
 import Agenda from './pages/Agenda'
+import LandingPages from './pages/LandingPages'
+import LandingPagePublic from './pages/LandingPagePublic'
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -50,6 +52,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/landing-page/:slug" element={<LandingPagePublic />} />
       <Route
         path="/"
         element={
@@ -101,6 +104,14 @@ function AppRoutes() {
         <Route
           path="colaboradores"
           element={<ColaboradoresList />}
+        />
+        <Route
+          path="landing-pages"
+          element={
+            <AdminOrAgenteRoute>
+              <LandingPages />
+            </AdminOrAgenteRoute>
+          }
         />
         <Route
           path="agenda"

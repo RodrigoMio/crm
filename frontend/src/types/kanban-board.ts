@@ -21,6 +21,7 @@ export interface KanbanBoard {
   updated_at: string;
   leads_count?: number;
   tipo_fluxo?: 'COMPRADOR' | 'VENDEDOR' | null;
+  limit_days?: number;
 }
 
 export interface BoardWithLeadsCount extends KanbanBoard {

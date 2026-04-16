@@ -1,6 +1,5 @@
-import { IsString, IsOptional, IsInt, Min, IsArray, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsInt, Min, IsArray } from 'class-validator';
 import { Type } from 'class-transformer';
-import { OrigemLead } from '../entities/lead.entity';
 
 export class FilterLeadsDto {
   @IsOptional()
@@ -29,8 +28,8 @@ export class FilterLeadsDto {
   usuario_id_colaborador?: number;
 
   @IsOptional()
-  @IsEnum(OrigemLead)
-  origem_lead?: OrigemLead;
+  @IsString()
+  origem_lead?: string;
 
   @IsOptional()
   @IsArray()

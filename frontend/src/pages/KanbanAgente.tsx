@@ -5,8 +5,7 @@ import { api } from '../services/api'
 import { BoardWithLeadsCount, CreateKanbanBoardDto, KanbanBoardType, MoveLeadDto } from '../types/kanban-board'
 import { Lead, FilterLeadsDto } from '../types/lead'
 import { useAuth } from '../contexts/AuthContext'
-import OccurrencesModal from '../components/OccurrencesModal'
-import EditLeadModal from '../components/EditLeadModal'
+import EditViewLeadModal from '../components/EditViewLeadModal'
 import ScheduleContactModal from '../components/ScheduleContactModal'
 import AppointmentBadge from '../components/AppointmentBadge'
 import FiltersModal from '../components/FiltersModal'
@@ -16,8 +15,24 @@ import './KanbanAgente.css'
 const STORAGE_KEY_FILTERS = 'kanban-agente-filters'
 const STORAGE_KEY_SEARCH_TYPE = 'kanban-agente-search-type'
 const STORAGE_KEY_TIPO_FLUXO = 'kanban-agente-tipo-fluxo'
+const STORAGE_KEY_EXPIRED_FILTER = 'kanban-agente-expired-filter'
 
 type SearchType = 'nome' | 'email' | 'telefone'
+
+// Função helper para verificar se um lead está expirado
+const isLeadExpired = (lead: Lead, board: BoardWithLeadsCount): boolean => {
+  if (!board.limit_days || board.limit_days === 0) return false;
+  
+  const referenceDate = lead.ultima_ocorrencia_date 
+    ? new Date(lead.ultima_ocorrencia_date)
+    : new Date(lead.data_entrada);
+  
+  const daysDiff = Math.floor(
+    (Date.now() - referenceDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  
+  return daysDiff > board.limit_days;
+};
 
 // Tipo estendido para incluir campos específicos da tela
 interface ExtendedFilters extends FilterLeadsDto {
@@ -30,11 +45,10 @@ export default function KanbanAgente() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
   const [draggedFromBoardId, setDraggedFromBoardId] = useState<number | null>(null)
-  const [selectedLeadForOccurrences, setSelectedLeadForOccurrences] = useState<Lead | null>(null)
-  const [editingLead, setEditingLead] = useState<Lead | null>(null)
+  const [selectedLeadForEditView, setSelectedLeadForEditView] = useState<Lead | null>(null)
   const [selectedLeadForSchedule, setSelectedLeadForSchedule] = useState<Lead | null>(null)
   const [openMenuLeadId, setOpenMenuLeadId] = useState<number | null>(null)
-  const [currentPage, setCurrentPage] = useState<number>(1)
+  // Removido currentPage global - cada board terá sua própria paginação
   const [showFiltersModal, setShowFiltersModal] = useState(false)
   const [availableTypes, setAvailableTypes] = useState<('COMPRADOR' | 'VENDEDOR')[]>([])
   const [selectedBoardForNewLead, setSelectedBoardForNewLead] = useState<number | null>(null)
@@ -96,6 +110,35 @@ export default function KanbanAgente() {
     }
   }, [tipoFluxo])
 
+  // Estado para filtro de leads expirados (por board)
+  const [expiredFilterActive, setExpiredFilterActive] = useState<Map<number, boolean>>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_EXPIRED_FILTER);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return new Map(Object.entries(parsed).map(([k, v]) => [Number(k), v as boolean]));
+      } catch {
+        return new Map();
+      }
+    }
+    return new Map();
+  });
+
+  // Salva estado do filtro de expirados no localStorage quando mudar
+  useEffect(() => {
+    const obj = Object.fromEntries(expiredFilterActive);
+    localStorage.setItem(STORAGE_KEY_EXPIRED_FILTER, JSON.stringify(obj));
+  }, [expiredFilterActive])
+
+  // Função para alternar filtro de expirados
+  const toggleExpiredFilter = (boardId: number) => {
+    setExpiredFilterActive(prev => {
+      const newMap = new Map(prev);
+      newMap.set(boardId, !prev.get(boardId));
+      return newMap;
+    });
+  };
+
   // Fecha dropdown ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -116,7 +159,6 @@ export default function KanbanAgente() {
   // Função para atualizar selectedAgenteId
   const setSelectedAgenteId = (value: string) => {
     setFilters(prev => ({ ...prev, selectedAgenteId: value || undefined }))
-    setCurrentPage(1)
     // Limpa tipos disponíveis quando desmarca agente (Admin)
     if (!value && user?.perfil === 'ADMIN') {
       setAvailableTypes([])
@@ -376,14 +418,14 @@ export default function KanbanAgente() {
     enabled: (user?.perfil === 'AGENTE' || (user?.perfil === 'ADMIN' && !!selectedAgenteId)) && !!tipoFluxo,
   })
 
-  // Busca leads de todos os boards automaticamente
+  // Busca leads de todos os boards automaticamente (sempre página 1 inicialmente)
   const boardLeadsQueries = useQuery({
-    queryKey: getLeadsQueryKey(boards.map(b => b.id).sort().join(','), filters as FilterLeadsDto, currentPage),
+    queryKey: getLeadsQueryKey(boards.map(b => b.id).sort().join(','), filters as FilterLeadsDto),
     queryFn: async () => {
       if (boards.length === 0) return {}
       const leadsPromises = boards.map(board => {
         const params = new URLSearchParams()
-        params.append('page', currentPage.toString())
+        params.append('page', '1')
         params.append('limit', '50')
         if (filters.nome_razao_social) {
           params.append('nome_razao_social', filters.nome_razao_social)
@@ -416,30 +458,17 @@ export default function KanbanAgente() {
         }
         return api.get(`/kanban-boards/${board.id}/leads?${params.toString()}`)
           .then(res => ({ boardId: board.id, data: res.data }))
-          .catch(() => ({ boardId: board.id, data: { data: [], total: 0, page: currentPage, limit: 50 } }))
+          .catch(() => ({ boardId: board.id, data: { data: [], total: 0, page: 1, limit: 50 } }))
       })
       const results = await Promise.all(leadsPromises)
       const leadsMap: Record<number, { data: Lead[]; total: number; page: number }> = {}
       
-      // Pega dados anteriores do cache
-      const previousData = queryClient.getQueryData<Record<number, { data: Lead[]; total: number; page: number }>>(
-        getLeadsQueryKey(boards.map(b => b.id).sort().join(','), filters as FilterLeadsDto, currentPage - 1)
-      ) || {}
-      
       results.forEach(({ boardId, data }) => {
-        if (currentPage === 1) {
-          leadsMap[boardId] = { 
-            data: data.data || [], 
-            total: data.total || 0,
-            page: data.page || currentPage
-          }
-        } else {
-          const existingData = previousData[boardId]?.data || []
-          leadsMap[boardId] = { 
-            data: [...existingData, ...(data.data || [])], 
-            total: data.total || 0,
-            page: data.page || currentPage
-          }
+        // Sempre página 1 na query inicial
+        leadsMap[boardId] = { 
+          data: data.data || [], 
+          total: data.total || 0,
+          page: data.page || 1
         }
       })
       return leadsMap
@@ -448,6 +477,30 @@ export default function KanbanAgente() {
   })
 
   const boardLeads = boardLeadsQueries.data || {}
+
+  // Desativa filtro de expirados automaticamente se não houver leads expirados
+  useEffect(() => {
+    if (!boards.length || !boardLeadsQueries.data) return;
+    
+    const newExpiredFilter = new Map(expiredFilterActive);
+    let hasChanges = false;
+    
+    boards.forEach(board => {
+      if (expiredFilterActive.get(board.id)) {
+        const leads = boardLeads[board.id]?.data || [];
+        const hasExpiredLeads = (board.limit_days ?? 0) > 0 && leads.some(lead => isLeadExpired(lead, board));
+        
+        if (!hasExpiredLeads) {
+          newExpiredFilter.delete(board.id);
+          hasChanges = true;
+        }
+      }
+    });
+    
+    if (hasChanges) {
+      setExpiredFilterActive(newExpiredFilter);
+    }
+  }, [boardLeads, boards, expiredFilterActive])
 
   const createBoardMutation = useMutation({
     mutationFn: async (data: CreateKanbanBoardDto) => {
@@ -593,7 +646,6 @@ export default function KanbanAgente() {
       toast.warning('Selecione um Agente para exibir')
       return
     }
-    setCurrentPage(1)
     queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
   }
 
@@ -617,7 +669,6 @@ export default function KanbanAgente() {
                 <button
                   onClick={() => {
                     setTipoFluxo('COMPRADOR')
-                    setCurrentPage(1)
                     queryClient.invalidateQueries({ queryKey: ['kanban-boards-agente'] })
                     queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
                   }}
@@ -640,7 +691,6 @@ export default function KanbanAgente() {
                 <button
                   onClick={() => {
                     setTipoFluxo('VENDEDOR')
-                    setCurrentPage(1)
                     queryClient.invalidateQueries({ queryKey: ['kanban-boards-agente'] })
                     queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
                   }}
@@ -958,6 +1008,31 @@ export default function KanbanAgente() {
                   </svg>
                     </button>
                   )}
+                  {(() => {
+                    const leads = boardLeads[board.id]?.data || [];
+                    const hasExpiredLeads = (board.limit_days ?? 0) > 0 && leads.some(lead => isLeadExpired(lead, board));
+                    return hasExpiredLeads && (
+                      <button
+                        className="btn-expired-filter"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleExpiredFilter(board.id);
+                        }}
+                        title={expiredFilterActive.get(board.id) 
+                          ? "Exibir todos os leads" 
+                          : "Exibir somente expirados"}
+                        style={{
+                          backgroundColor: expiredFilterActive.get(board.id) ? 'white' : 'transparent'
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff9800" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                          <line x1="12" y1="9" x2="12" y2="13"></line>
+                          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                      </button>
+                    );
+                  })()}
                   <span className="board-count">
                     {hasAnyFilter && boardLeads[board.id]?.total !== undefined
                       ? `${boardLeads[board.id].total} de ${board.leads_count || 0}`
@@ -973,12 +1048,29 @@ export default function KanbanAgente() {
                   <div>Carregando...</div>
                 ) : (
                   <>
-                    {(boardLeads[board.id]?.data || []).map((lead) => (
+                    {(() => {
+                      const leads = boardLeads[board.id]?.data || [];
+                      // Aplicar filtro de expirados se ativo
+                      const filteredLeads = expiredFilterActive.get(board.id)
+                        ? leads.filter(lead => isLeadExpired(lead, board))
+                        : leads;
+                      return filteredLeads.map((lead) => {
+                        const isExpired = isLeadExpired(lead, board);
+                        return (
                       <div
                         key={lead.id}
                         className="kanban-card"
                         draggable
                         onDragStart={(e) => handleDragStart(e, lead, board.id)}
+                        onClick={(e) => {
+                          // Não abre o modal se clicar em elementos interativos (botões, links, etc)
+                          const target = e.target as HTMLElement
+                          if (target.closest('button') || target.closest('a') || target.closest('.card-menu-container')) {
+                            return
+                          }
+                          setSelectedLeadForEditView(lead)
+                        }}
+                        style={{ cursor: 'pointer' }}
                       >
                         <div className="card-header">
                           <div className="card-name">
@@ -1005,21 +1097,11 @@ export default function KanbanAgente() {
                                   className="card-menu-item"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    setEditingLead(lead)
+                                    setSelectedLeadForEditView(lead)
                                     setOpenMenuLeadId(null)
                                   }}
                                 >
-                                  Editar Lead
-                                </button>
-                                <button
-                                  className="card-menu-item"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setSelectedLeadForOccurrences(lead)
-                                    setOpenMenuLeadId(null)
-                                  }}
-                                >
-                                  Ocorrências
+                                  Editar/Ver lead
                                 </button>
                                 <button
                                   className="card-menu-item"
@@ -1084,17 +1166,30 @@ export default function KanbanAgente() {
                         )}
                         <div className="card-footer">
                           <AppointmentBadge leadId={lead.id} />
-                          {lead.data_entrada && (
+                          {(lead.ultima_ocorrencia_date || lead.data_entrada) && (
                             <span 
-                              className="card-data-entrada"
-                              title="Data de entrada do lead"
+                              className={`card-data-entrada ${isExpired ? 'card-data-expired' : ''}`}
+                              title={lead.ultima_ocorrencia_date 
+                                ? "Data da última ocorrência" 
+                                : "Data de entrada do lead"}
                             >
-                              {new Date(lead.data_entrada).toLocaleDateString('pt-BR')}
+                              {isExpired && (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff9800" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px', flexShrink: 0 }}>
+                                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                </svg>
+                              )}
+                              {lead.ultima_ocorrencia_date
+                                ? new Date(lead.ultima_ocorrencia_date).toLocaleDateString('pt-BR')
+                                : new Date(lead.data_entrada).toLocaleDateString('pt-BR')}
                             </span>
                           )}
                         </div>
                       </div>
-                    ))}
+                        );
+                      })
+                    })()}
                     {(() => {
                       const boardData = boardLeads[board.id]
                       const total = boardData?.total || 0
@@ -1106,55 +1201,71 @@ export default function KanbanAgente() {
                         <button 
                           className="btn-mostrar-mais"
                           onClick={async () => {
-                            const nextPage = currentPage + 1
-                            const leadsPromises = boards.map(board => {
-                              const params = new URLSearchParams()
-                              params.append('page', nextPage.toString())
-                              params.append('limit', '50')
-                              if (filters.nome_razao_social) {
-                                params.append('nome_razao_social', filters.nome_razao_social)
-                              }
-                              if (filters.uf) {
-                                const ufs = Array.isArray(filters.uf) ? filters.uf : [filters.uf]
-                                ufs.forEach(uf => {
-                                  params.append('uf', uf)
-                                })
-                              }
-                              if (filters.vendedor_id) {
-                                params.append('vendedor_id', filters.vendedor_id.toString())
-                              }
-                              if (filters.usuario_id_colaborador) {
-                                params.append('usuario_id_colaborador', filters.usuario_id_colaborador.toString())
-                              }
-                              if (filters.origem_lead) {
-                                params.append('origem_lead', filters.origem_lead)
-                              }
-                              if (filters.produtos && filters.produtos.length > 0) {
-                                filters.produtos.forEach(produtoId => {
-                                  params.append('produtos', produtoId.toString())
-                                })
-                              }
-                              return api.get(`/kanban-boards/${board.id}/leads?${params.toString()}`)
-                                .then(res => ({ boardId: board.id, data: res.data }))
-                                .catch(() => ({ boardId: board.id, data: { data: [], total: 0, page: nextPage, limit: 50 } }))
-                            })
-                            const results = await Promise.all(leadsPromises)
+                            // Pega a página atual deste board específico
+                            const currentBoardPage = boardData?.page || 1
+                            const nextPage = currentBoardPage + 1
                             
-                            const nextQueryKey = getLeadsQueryKey(boards.map(b => b.id).sort().join(','), filters as FilterLeadsDto, nextPage)
-                            const currentData = boardLeads
-                            const newData: Record<number, { data: Lead[]; total: number; page: number }> = {}
+                            // Busca apenas os próximos 50 leads deste board específico
+                            const params = new URLSearchParams()
+                            params.append('page', nextPage.toString())
+                            params.append('limit', '50')
+                            if (filters.nome_razao_social) {
+                              params.append('nome_razao_social', filters.nome_razao_social)
+                            }
+                            if (filters.email) {
+                              params.append('email', filters.email)
+                            }
+                            if (filters.telefone) {
+                              params.append('telefone', filters.telefone)
+                            }
+                            if (filters.uf) {
+                              const ufs = Array.isArray(filters.uf) ? filters.uf : [filters.uf]
+                              ufs.forEach(uf => {
+                                params.append('uf', uf)
+                              })
+                            }
+                            if (filters.vendedor_id) {
+                              params.append('vendedor_id', filters.vendedor_id.toString())
+                            }
+                            if (filters.usuario_id_colaborador) {
+                              params.append('usuario_id_colaborador', filters.usuario_id_colaborador.toString())
+                            }
+                            if (filters.origem_lead) {
+                              params.append('origem_lead', filters.origem_lead)
+                            }
+                            if (filters.produtos && filters.produtos.length > 0) {
+                              filters.produtos.forEach(produtoId => {
+                                params.append('produtos', produtoId.toString())
+                              })
+                            }
                             
-                            results.forEach(({ boardId, data }) => {
-                              const existingData = currentData[boardId]?.data || []
-                              newData[boardId] = {
-                                data: [...existingData, ...(data.data || [])],
-                                total: data.total || 0,
+                            try {
+                              const response = await api.get(`/kanban-boards/${board.id}/leads?${params.toString()}`)
+                              const newLeadsData = response.data
+                              
+                              // Atualiza o cache preservando os dados de todos os outros boards
+                              const queryKey = getLeadsQueryKey(boards.map(b => b.id).sort().join(','), filters as FilterLeadsDto)
+                              const currentData = queryClient.getQueryData<Record<number, { data: Lead[]; total: number; page: number }>>(queryKey) || boardLeads
+                              
+                              // Cria novo objeto preservando todos os boards e atualizando apenas o board clicado
+                              const updatedData: Record<number, { data: Lead[]; total: number; page: number }> = {
+                                ...currentData
+                              }
+                              
+                              // Atualiza apenas o board específico, acumulando os novos leads
+                              const existingLeads = updatedData[board.id]?.data || []
+                              updatedData[board.id] = {
+                                data: [...existingLeads, ...(newLeadsData.data || [])],
+                                total: newLeadsData.total || 0,
                                 page: nextPage
                               }
-                            })
-                            
-                            queryClient.setQueryData(nextQueryKey, newData)
-                            setCurrentPage(nextPage)
+                              
+                              // Atualiza o cache preservando todos os boards
+                              queryClient.setQueryData(queryKey, updatedData)
+                            } catch (error) {
+                              console.error(`Erro ao carregar mais leads do board ${board.id}:`, error)
+                              toast.error('Erro ao carregar mais leads')
+                            }
                           }}
                         >
                           Ver mais
@@ -1240,29 +1351,17 @@ export default function KanbanAgente() {
         </div>
       )}
 
-      {/* Modal de Ocorrências */}
-      {selectedLeadForOccurrences && (
-        <OccurrencesModal
-          leadId={selectedLeadForOccurrences.id}
-          leadName={selectedLeadForOccurrences.nome_fantasia_apelido || selectedLeadForOccurrences.nome_razao_social}
-          onClose={() => setSelectedLeadForOccurrences(null)}
+      {/* Modal de Editar/Ver Lead */}
+      {selectedLeadForEditView && (
+        <EditViewLeadModal
+          lead={selectedLeadForEditView}
+          leadName={selectedLeadForEditView.nome_fantasia_apelido || selectedLeadForEditView.nome_razao_social}
+          onClose={() => setSelectedLeadForEditView(null)}
+          onSuccess={() => {
+            setSelectedLeadForEditView(null)
+          }}
+          invalidateQueries={['kanban-board-leads-all-agente']}
         />
-      )}
-
-      {/* Modal de Edição */}
-      {editingLead && (
-        <div className="modal-overlay" onClick={() => setEditingLead(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%' }}>
-            <EditLeadModal
-              lead={editingLead}
-              onClose={() => setEditingLead(null)}
-              onSuccess={() => {
-                setEditingLead(null)
-              }}
-              invalidateQueries={['kanban-board-leads-all-agente']}
-            />
-          </div>
-        </div>
       )}
 
       {/* Modal de Agendamento */}
@@ -1282,12 +1381,10 @@ export default function KanbanAgente() {
         filters={filters as FilterLeadsDto}
         onFiltersChange={(newFilters) => setFilters(prev => ({ ...prev, ...newFilters }))}
         onApply={() => {
-          setCurrentPage(1)
           queryClient.invalidateQueries({ queryKey: ['kanban-board-leads-all-agente'] })
         }}
         onClear={() => {
           setFilters({})
-          setCurrentPage(1)
           queryClient.invalidateQueries({ queryKey: ['kanban-board-leads-all-agente'] })
         }}
         agentes={user?.perfil === 'ADMIN' ? agentes : []}
@@ -1307,7 +1404,6 @@ export default function KanbanAgente() {
                 onClose={() => setSelectedBoardForNewLead(null)}
                 onSuccess={() => {
                   setSelectedBoardForNewLead(null)
-                  setCurrentPage(1)
                   queryClient.invalidateQueries({ queryKey: ['kanban-board-leads-all-agente'] })
                 }}
                 invalidateQueries={['kanban-board-leads-all-agente']}

@@ -95,4 +95,7 @@ export class KanbanBoard {
     name: 'tipo_fluxo',
   })
   tipo_fluxo: 'COMPRADOR' | 'VENDEDOR' | null;
+
+  @Column({ type: 'integer', default: 0, name: 'limit_days' })
+  limit_days: number;
 }
