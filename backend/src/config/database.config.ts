@@ -36,15 +36,123 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
     return process.env[key] ? parseInt(process.env[key]!, 10) : defaultValue;
   }
 
-  createTypeOrmOptions(): DataSourceOptions {
-    // Opcional: alinha a sessão do PostgreSQL a um fuso (ex.: America/Sao_Paulo).
-    // Útil no Railway quando o banco e o app estão em UTC mas a operação é no Brasil.
-    // Defina no Railway: DB_TIMEZONE=America/Sao_Paulo
+  /**
+   * Railway / Neon etc.: URL completa.
+   * Remove aspas, espaços e caracteres invisíveis (BOM) que quebram o DNS (EAI_FAIL).
+   */
+  private getDatabaseUrl(): string {
+    let raw = this.getEnv('DATABASE_URL', '').trim();
+    if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+      raw = raw.slice(1, -1).trim();
+    }
+    raw = raw.replace(/[\u200B-\u200D\uFEFF]/g, '');
+    raw = raw.replace(/\s/g, '');
+    return raw;
+  }
+
+  /**
+   * SSL: explícito via DB_SSL=true, ou inferido da URL (proxy público rlwy.net, sslmode=require).
+   * Conexão interna postgres.railway.internal normalmente não precisa de SSL.
+   */
+  private resolveSsl(databaseUrl?: string): false | { rejectUnauthorized: boolean } {
+    if (this.getEnv('DB_SSL', '').toLowerCase() === 'true') {
+      return { rejectUnauthorized: false };
+    }
+    if (!databaseUrl) {
+      return false;
+    }
+    try {
+      const u = new URL(databaseUrl);
+      const mode = (u.searchParams.get('sslmode') || '').toLowerCase();
+      if (['require', 'verify-ca', 'verify-full'].includes(mode)) {
+        return { rejectUnauthorized: false };
+      }
+      if (u.hostname.endsWith('.rlwy.net')) {
+        return { rejectUnauthorized: false };
+      }
+    } catch {
+      /* URL inválida: ignora inferência */
+    }
+    return false;
+  }
+
+  /**
+   * Opções do pool `pg`: timeout de conexão + timezone da sessão.
+   * Sem timeout explícito, falhas de rede/DB podem segurar o bootstrap e o Railway
+   * retorna 502 (dial timeout na PORT) antes de `app.listen()`.
+   */
+  private buildPgExtra(): Record<string, unknown> {
+    let connectionTimeoutMillis = this.getEnvNumber('PG_CONNECTION_TIMEOUT_MS', 10_000);
+    if (!Number.isFinite(connectionTimeoutMillis) || connectionTimeoutMillis < 1000) {
+      connectionTimeoutMillis = 10_000;
+    }
     const dbTimezone = this.getEnv('DB_TIMEZONE', '').trim();
-    const extra =
-      dbTimezone.length > 0
-        ? { options: `-c TimeZone=${dbTimezone}` }
-        : undefined;
+    const extra: Record<string, unknown> = { connectionTimeoutMillis };
+    if (dbTimezone.length > 0) {
+      extra.options = `-c TimeZone=${dbTimezone}`;
+    }
+    return extra;
+  }
+
+  private typeOrmRetryOptions(): { retryAttempts: number; retryDelay: number } {
+    let attempts = this.getEnvNumber('TYPEORM_RETRY_ATTEMPTS', 4);
+    let delayMs = this.getEnvNumber('TYPEORM_RETRY_DELAY_MS', 1500);
+    if (!Number.isFinite(attempts) || attempts < 1) {
+      attempts = 4;
+    }
+    if (!Number.isFinite(delayMs) || delayMs < 100) {
+      delayMs = 1500;
+    }
+    attempts = Math.min(20, Math.max(1, attempts));
+    delayMs = Math.min(30_000, Math.max(100, delayMs));
+    return { retryAttempts: attempts, retryDelay: delayMs };
+  }
+
+  createTypeOrmOptions(): DataSourceOptions {
+    const extra = this.buildPgExtra();
+    const retry = this.typeOrmRetryOptions();
+
+    const entities = [
+      User,
+      Lead,
+      Produto,
+      ProdutoTipo,
+      Ocorrencia,
+      LeadOcorrencia,
+      LeadsProduto,
+      KanbanBoard,
+      KanbanModelo,
+      KanbanModeloStatus,
+      KanbanStatus,
+      Occurrence,
+      Appointment,
+      LandingPage,
+      LandingPageProduto,
+    ];
+
+    const logging = this.getEnv('NODE_ENV', 'development') === 'development';
+
+    const databaseUrl = this.getDatabaseUrl();
+    if (databaseUrl) {
+      if (logging) {
+        try {
+          const host = new URL(databaseUrl).hostname;
+          console.log(`[DatabaseConfig] Postgres (DATABASE_URL) host: ${host}`);
+        } catch {
+          console.warn('[DatabaseConfig] DATABASE_URL não é uma URL válida.');
+        }
+      }
+      return {
+        type: 'postgres',
+        url: databaseUrl,
+        extra,
+        ...retry,
+        entities,
+        synchronize: false,
+        logging,
+        ssl: this.resolveSsl(databaseUrl),
+      };
+    }
 
     return {
       type: 'postgres',
@@ -53,26 +161,11 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       username: this.getEnv('DB_USERNAME', 'postgres'),
       password: this.getEnv('DB_PASSWORD', 'postgres'),
       database: this.getEnv('DB_DATABASE', 'crm_leads'),
-      ...(extra ? { extra } : {}),
-      entities: [
-        User,
-        Lead,
-        Produto,
-        ProdutoTipo,
-        Ocorrencia,
-        LeadOcorrencia,
-        LeadsProduto,
-        KanbanBoard,
-        KanbanModelo,
-        KanbanModeloStatus,
-        KanbanStatus,
-        Occurrence,
-        Appointment,
-        LandingPage,
-        LandingPageProduto,
-      ],
-      synchronize: false, // Desabilitado - alterações no banco devem ser feitas manualmente
-      logging: this.getEnv('NODE_ENV', 'development') === 'development',
+      extra,
+      ...retry,
+      entities,
+      synchronize: false,
+      logging,
       ssl: this.getEnv('DB_SSL', 'false') === 'true' ? { rejectUnauthorized: false } : false,
     };
   }

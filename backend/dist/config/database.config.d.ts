@@ -6,6 +6,10 @@ export declare class DatabaseConfig implements TypeOrmOptionsFactory {
     constructor(configService?: ConfigService);
     private getEnv;
     private getEnvNumber;
+    private getDatabaseUrl;
+    private resolveSsl;
+    private buildPgExtra;
+    private typeOrmRetryOptions;
     createTypeOrmOptions(): DataSourceOptions;
     getDatabaseConfig(): DataSourceOptions;
 }

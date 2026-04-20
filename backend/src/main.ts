@@ -25,7 +25,10 @@ function isPortAvailable(port: number): Promise<boolean> {
 }
 
 async function bootstrap() {
+  // Log imediato: se não aparecer nos deploy logs, o processo nem chegou aqui (build/start).
+  console.log('[bootstrap] Iniciando NestFactory.create (TypeORM conecta nesta fase)...');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  console.log('[bootstrap] AppModule carregado; configurando middleware e estáticos...');
   
   // Configura timeout para requisições longas (importação de planilhas grandes)
   app.use((req, res, next) => {
@@ -189,8 +192,9 @@ async function bootstrap() {
     console.warn('💡 Defina FRONTEND_DIST_PATH no .env com o caminho absoluto do frontend/dist');
   }
   
-  // Usa PORT_SERVER (KingHost) ou PORT (padrão) ou 3001 como fallback
-  const port = parseInt(process.env.PORT_SERVER || process.env.PORT || '3001', 10);
+  // Railway/Render/Fly injetam PORT — o proxy só encaminha para essa porta.
+  // KingHost legado: só PORT_SERVER (sem PORT). Se ambos existirem, PORT ganha (evita 502).
+  const port = parseInt(process.env.PORT || process.env.PORT_SERVER || '3001', 10);
   const host = process.env.HOST || '0.0.0.0'; // 0.0.0.0 permite acesso de qualquer IP na rede
 
   // Railway / Render / Fly etc. injetam PORT e o proxy já roteia; checar porta com net.createServer
@@ -217,6 +221,7 @@ async function bootstrap() {
   }
 
   try {
+    console.log(`[bootstrap] Escutando em ${host}:${port}...`);
     await app.listen(port, host);
     console.log(`🚀 Backend rodando na porta ${port}`);
     console.log(`📡 API disponível em http://localhost:${port}/api`);

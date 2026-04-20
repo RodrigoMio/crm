@@ -23,7 +23,9 @@ function isPortAvailable(port) {
     });
 }
 async function bootstrap() {
+    console.log('[bootstrap] Iniciando NestFactory.create (TypeORM conecta nesta fase)...');
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
+    console.log('[bootstrap] AppModule carregado; configurando middleware e estáticos...');
     app.use((req, res, next) => {
         if (req.path.includes('/import')) {
             req.setTimeout(600000);
@@ -142,7 +144,7 @@ async function bootstrap() {
         possibleFrontendPaths.forEach(p => console.warn(`   - ${p}`));
         console.warn('💡 Defina FRONTEND_DIST_PATH no .env com o caminho absoluto do frontend/dist');
     }
-    const port = parseInt(process.env.PORT_SERVER || process.env.PORT || '3001', 10);
+    const port = parseInt(process.env.PORT || process.env.PORT_SERVER || '3001', 10);
     const host = process.env.HOST || '0.0.0.0';
     const skipPortProbe = Boolean(process.env.PORT) ||
         Boolean(process.env.RAILWAY_ENVIRONMENT) ||
@@ -163,6 +165,7 @@ async function bootstrap() {
         }
     }
     try {
+        console.log(`[bootstrap] Escutando em ${host}:${port}...`);
         await app.listen(port, host);
         console.log(`🚀 Backend rodando na porta ${port}`);
         console.log(`📡 API disponível em http://localhost:${port}/api`);
