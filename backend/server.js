@@ -33,11 +33,17 @@ if (!process.env.NODE_ENV) {
   process.env.NODE_ENV = 'production';
 }
 
-// Define a porta usando PORT_SERVER da KingHost ou PORT padrão
-// A KingHost usa PORT_SERVER, mas o NestJS usa PORT
+// KingHost: só PORT_SERVER. Railway/Render/Fly: injetam PORT — nunca sobrescrever.
+// Nest (main.ts) usa: PORT || PORT_SERVER || 3001
 if (process.env.PORT_SERVER && !process.env.PORT) {
   process.env.PORT = process.env.PORT_SERVER;
 }
+const nestListenPort = String(
+  parseInt(process.env.PORT || process.env.PORT_SERVER || '3001', 10) || 3001,
+);
+console.log(
+  `[server.js] PORT=${process.env.PORT ?? '(vazio)'} PORT_SERVER=${process.env.PORT_SERVER ?? '(vazio)'} → Nest escuta em: ${nestListenPort}`,
+);
 
 // Caminho para o arquivo compilado
 // Tenta diferentes localizações possíveis na estrutura da KingHost
@@ -73,7 +79,7 @@ if (!distPath) {
 try {
   console.log('🚀 Iniciando aplicação NestJS...');
   console.log(`📁 Arquivo: ${distPath}`);
-  console.log(`🌐 Porta: ${process.env.PORT || process.env.PORT_SERVER || '3001'}`);
+  console.log(`🌐 Porta efetiva (proxy deve apontar aqui): ${nestListenPort}`);
   console.log(`🔧 Ambiente: ${process.env.NODE_ENV}`);
   
   require(distPath);

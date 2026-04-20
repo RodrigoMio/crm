@@ -1,0 +1,14 @@
+# Monorepo: Root Directory = raiz do repositório (pasta CRM).
+#
+# Se no painel da Railway existir "Custom Build/Start Command", ele costuma SOBRESCREVER este arquivo.
+# Antes: só `npm install` (sem compilar) + `node backend/dist/main.js` → o dist tinha que vir do Git.
+# Agora: o build DEVE rodar `nest build` + build do frontend; o dist não precisa (nem deve) ir no Git.
+
+[build]
+builder = "NIXPACKS"
+# devDependencies do backend (@nestjs/cli) são necessários para o nest build.
+buildCommand = "NPM_CONFIG_PRODUCTION=false npm run install:all && npm run build"
+
+[deploy]
+# Equivale a `cd backend && node dist/main.js` com cwd na raiz do repo.
+startCommand = "node backend/dist/main.js"
