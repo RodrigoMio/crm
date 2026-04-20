@@ -61,4 +61,6 @@ export declare class Lead {
     tipo_lead: string[];
     created_at: Date;
     updated_at: Date;
+    ensureTimestampsOnInsert(): void;
+    ensureUpdatedAtOnUpdate(): void;
 }

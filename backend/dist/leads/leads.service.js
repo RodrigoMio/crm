@@ -22,6 +22,7 @@ const produto_entity_1 = require("../produtos/entities/produto.entity");
 const ocorrencia_entity_1 = require("../ocorrencias/entities/ocorrencia.entity");
 const lead_ocorrencia_entity_1 = require("../lead-ocorrencias/entities/lead-ocorrencia.entity");
 const leads_produto_entity_1 = require("../leads-produtos/entities/leads-produto.entity");
+const pg_unaccent_search_1 = require("../database/pg-unaccent-search");
 let LeadsService = class LeadsService {
     constructor(leadsRepository, usersRepository, produtoRepository, ocorrenciaRepository, leadOcorrenciaRepository, leadsProdutoRepository, dataSource) {
         this.leadsRepository = leadsRepository;
@@ -37,6 +38,15 @@ let LeadsService = class LeadsService {
             return parseInt(id, 10);
         }
         return Number(id);
+    }
+    accentInsensitiveKey(text) {
+        return (text || '')
+            .trim()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/ç/g, 'c')
+            .replace(/ñ/g, 'n');
     }
     async create(createLeadDto, currentUser) {
         if (currentUser.perfil === user_entity_1.UserProfile.COLABORADOR) {
@@ -174,16 +184,14 @@ let LeadsService = class LeadsService {
             queryBuilder.where('1 = 0');
         }
         if (filterDto.nome_razao_social) {
-            const fromChars = 'áàâãäéèêëíìîïóòôõöúùûüçñýÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑÝ';
-            const toChars = 'aaaaaeeeeiiiiooooouuuucnyAAAAAEEEEIIIIOOOOOUUUUCNY';
-            queryBuilder.andWhere(`translate(LOWER(lead.nome_razao_social), :fromChars, :toChars) ILIKE translate(LOWER(:nome), :fromChars, :toChars)`, {
+            queryBuilder.andWhere((0, pg_unaccent_search_1.pgWhereUnaccentContains)('COALESCE(lead.nome_razao_social, \'\')', 'nome'), {
                 nome: `%${filterDto.nome_razao_social.trim()}%`,
-                fromChars,
-                toChars
             });
         }
         if (filterDto.email) {
-            queryBuilder.andWhere('LOWER(lead.email) ILIKE LOWER(:email)', { email: `%${filterDto.email.trim()}%` });
+            queryBuilder.andWhere((0, pg_unaccent_search_1.pgWhereUnaccentContains)('COALESCE(lead.email, \'\')', 'email'), {
+                email: `%${filterDto.email.trim()}%`,
+            });
         }
         if (filterDto.telefone) {
             const telefoneNumeros = filterDto.telefone.trim().replace(/\D/g, '');
@@ -430,7 +438,7 @@ let LeadsService = class LeadsService {
         const descricaoNormalizada = descricao.trim();
         const produto = await manager
             .createQueryBuilder(produto_entity_1.Produto, 'produto')
-            .where('LOWER(produto.descricao) = LOWER(:descricao)', { descricao: descricaoNormalizada })
+            .where((0, pg_unaccent_search_1.pgWhereUnaccentEquals)('produto.descricao', 'descricao'), { descricao: descricaoNormalizada })
             .getOne();
         if (produto) {
             return produto;
@@ -444,7 +452,7 @@ let LeadsService = class LeadsService {
         const descricaoNormalizada = descricao.trim();
         const ocorrencia = await manager
             .createQueryBuilder(ocorrencia_entity_1.Ocorrencia, 'ocorrencia')
-            .where('LOWER(ocorrencia.descricao) = LOWER(:descricao)', { descricao: descricaoNormalizada })
+            .where((0, pg_unaccent_search_1.pgWhereUnaccentEquals)('ocorrencia.descricao', 'descricao'), { descricao: descricaoNormalizada })
             .getOne();
         if (ocorrencia) {
             return ocorrencia;
@@ -617,15 +625,15 @@ let LeadsService = class LeadsService {
             const produtoFinal = produtosArray.join(' ');
             if (!produtoFinal)
                 continue;
-            let ocorrencia = ocorrenciasCache.get(descricaoOcorrencia.toLowerCase());
+            let ocorrencia = ocorrenciasCache.get(this.accentInsensitiveKey(descricaoOcorrencia));
             if (!ocorrencia) {
                 ocorrencia = await this.findOrCreateOcorrencia(manager, descricaoOcorrencia);
-                ocorrenciasCache.set(descricaoOcorrencia.toLowerCase(), ocorrencia);
+                ocorrenciasCache.set(this.accentInsensitiveKey(descricaoOcorrencia), ocorrencia);
             }
-            let produto = produtosCache.get(produtoFinal.toLowerCase());
+            let produto = produtosCache.get(this.accentInsensitiveKey(produtoFinal));
             if (!produto) {
                 produto = await this.findOrCreateProduto(manager, produtoFinal);
-                produtosCache.set(produtoFinal.toLowerCase(), produto);
+                produtosCache.set(this.accentInsensitiveKey(produtoFinal), produto);
             }
             const data = this.parseOcorrenciaDate(dataString);
             const leadOcorrencia = manager.create(lead_ocorrencia_entity_1.LeadOcorrencia, {
@@ -655,10 +663,10 @@ let LeadsService = class LeadsService {
             return;
         }
         for (const tag of tags) {
-            let produto = produtosCache.get(tag.toLowerCase());
+            let produto = produtosCache.get(this.accentInsensitiveKey(tag));
             if (!produto) {
                 produto = await this.findOrCreateProduto(manager, tag);
-                produtosCache.set(tag.toLowerCase(), produto);
+                produtosCache.set(this.accentInsensitiveKey(tag), produto);
             }
             await this.findOrCreateLeadsProduto(manager, leadId, produto.produto_id);
         }
@@ -769,38 +777,38 @@ let LeadsService = class LeadsService {
         if (produtosUnicos.size > 0) {
             const produtosExistentes = await this.produtoRepository
                 .createQueryBuilder('produto')
-                .where('LOWER(produto.descricao) IN (:...descricoes)', {
-                descricoes: Array.from(produtosUnicos).map(p => p.toLowerCase()),
+                .where((0, pg_unaccent_search_1.pgWhereUnaccentIn)('produto.descricao', 'descricoes'), {
+                descricoes: Array.from(produtosUnicos),
             })
                 .getMany();
             produtosExistentes.forEach(p => {
-                produtosCache.set(p.descricao.toLowerCase(), p);
+                produtosCache.set(this.accentInsensitiveKey(p.descricao), p);
             });
-            const produtosParaCriar = Array.from(produtosUnicos).filter(p => !produtosCache.has(p.toLowerCase()));
+            const produtosParaCriar = Array.from(produtosUnicos).filter(p => !produtosCache.has(this.accentInsensitiveKey(p)));
             if (produtosParaCriar.length > 0) {
                 const novosProdutos = produtosParaCriar.map(descricao => this.produtoRepository.create({ descricao: descricao.trim() }));
                 const produtosCriados = await this.produtoRepository.save(novosProdutos);
                 produtosCriados.forEach(p => {
-                    produtosCache.set(p.descricao.toLowerCase(), p);
+                    produtosCache.set(this.accentInsensitiveKey(p.descricao), p);
                 });
             }
         }
         if (ocorrenciasUnicas.size > 0) {
             const ocorrenciasExistentes = await this.ocorrenciaRepository
                 .createQueryBuilder('ocorrencia')
-                .where('LOWER(ocorrencia.descricao) IN (:...descricoes)', {
-                descricoes: Array.from(ocorrenciasUnicas).map(o => o.toLowerCase()),
+                .where((0, pg_unaccent_search_1.pgWhereUnaccentIn)('ocorrencia.descricao', 'descricoes'), {
+                descricoes: Array.from(ocorrenciasUnicas),
             })
                 .getMany();
             ocorrenciasExistentes.forEach(o => {
-                ocorrenciasCache.set(o.descricao.toLowerCase(), o);
+                ocorrenciasCache.set(this.accentInsensitiveKey(o.descricao), o);
             });
-            const ocorrenciasParaCriar = Array.from(ocorrenciasUnicas).filter(o => !ocorrenciasCache.has(o.toLowerCase()));
+            const ocorrenciasParaCriar = Array.from(ocorrenciasUnicas).filter(o => !ocorrenciasCache.has(this.accentInsensitiveKey(o)));
             if (ocorrenciasParaCriar.length > 0) {
                 const novasOcorrencias = ocorrenciasParaCriar.map(descricao => this.ocorrenciaRepository.create({ descricao: descricao.trim() }));
                 const ocorrenciasCriadas = await this.ocorrenciaRepository.save(novasOcorrencias);
                 ocorrenciasCriadas.forEach(o => {
-                    ocorrenciasCache.set(o.descricao.toLowerCase(), o);
+                    ocorrenciasCache.set(this.accentInsensitiveKey(o.descricao), o);
                 });
             }
         }

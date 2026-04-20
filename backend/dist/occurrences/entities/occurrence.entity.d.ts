@@ -14,4 +14,5 @@ export declare class Occurrence {
     tipo: OccurrenceType;
     tipo_fluxo: 'COMPRADOR' | 'VENDEDOR' | null;
     created_at: Date;
+    ensureCreatedAt(): void;
 }

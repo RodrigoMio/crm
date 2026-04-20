@@ -26,6 +26,7 @@ const kanban_status_entity_1 = require("../kanban-modelos/entities/kanban-status
 const occurrence_entity_1 = require("../occurrences/entities/occurrence.entity");
 const leads_produto_entity_1 = require("../leads-produtos/entities/leads-produto.entity");
 const produto_entity_1 = require("../produtos/entities/produto.entity");
+const pg_unaccent_search_1 = require("../database/pg-unaccent-search");
 var TipoFluxo;
 (function (TipoFluxo) {
     TipoFluxo["COMPRADOR"] = "COMPRADOR";
@@ -132,8 +133,8 @@ let KanbanBoardsService = class KanbanBoardsService {
             });
         }
         if (filterDto.nome) {
-            queryBuilder.andWhere('board.nome ILIKE :nome', {
-                nome: `%${filterDto.nome}%`,
+            queryBuilder.andWhere((0, pg_unaccent_search_1.pgWhereUnaccentContains)('COALESCE(board.nome, \'\')', 'nomeBoard'), {
+                nomeBoard: `%${filterDto.nome.trim()}%`,
             });
         }
         if (filterDto.tipo_fluxo) {
@@ -761,20 +762,12 @@ let KanbanBoardsService = class KanbanBoardsService {
                 console.log('[getLeadsByBoard] Filtro tipo_lead aplicado para ADMIN:', tipoFluxoClean);
             }
             if (filterDto.nome_razao_social) {
-                const fromChars = 'áàâãäéèêëíìîïóòôõöúùûüçñýÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑÝ';
-                const toChars = 'aaaaaeeeeiiiiooooouuuucnyAAAAAEEEEIIIIOOOOOUUUUCNY';
-                queryBuilder.andWhere(`(
-            translate(LOWER(lead.nome_razao_social), :fromChars, :toChars) ILIKE translate(LOWER(:nome), :fromChars, :toChars)
-            OR 
-            translate(LOWER(lead.nome_fantasia_apelido), :fromChars, :toChars) ILIKE translate(LOWER(:nome), :fromChars, :toChars)
-          )`, {
-                    nome: `%${filterDto.nome_razao_social.trim()}%`,
-                    fromChars,
-                    toChars
-                });
+                queryBuilder.andWhere(`(${(0, pg_unaccent_search_1.pgWhereUnaccentContains)(`COALESCE(lead.nome_razao_social, '')`, 'nome')} OR ${(0, pg_unaccent_search_1.pgWhereUnaccentContains)(`COALESCE(lead.nome_fantasia_apelido, '')`, 'nome')})`, { nome: `%${filterDto.nome_razao_social.trim()}%` });
             }
             if (filterDto.email) {
-                queryBuilder.andWhere('LOWER(lead.email) ILIKE LOWER(:email)', { email: `%${filterDto.email.trim()}%` });
+                queryBuilder.andWhere((0, pg_unaccent_search_1.pgWhereUnaccentContains)('COALESCE(lead.email, \'\')', 'email'), {
+                    email: `%${filterDto.email.trim()}%`,
+                });
             }
             if (filterDto.telefone) {
                 const telefoneNumeros = filterDto.telefone.trim().replace(/\D/g, '');
@@ -1183,20 +1176,12 @@ let KanbanBoardsService = class KanbanBoardsService {
                 queryBuilder.andWhere(':tipoFluxo = ANY(lead.tipo_lead)', { tipoFluxo: tipoFluxoClean });
             }
             if (filterDto.nome_razao_social) {
-                const fromChars = 'áàâãäéèêëíìîïóòôõöúùûüçñýÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑÝ';
-                const toChars = 'aaaaaeeeeiiiiooooouuuucnyAAAAAEEEEIIIIOOOOOUUUUCNY';
-                queryBuilder.andWhere(`(
-            translate(LOWER(lead.nome_razao_social), :fromChars, :toChars) ILIKE translate(LOWER(:nome), :fromChars, :toChars)
-            OR 
-            translate(LOWER(lead.nome_fantasia_apelido), :fromChars, :toChars) ILIKE translate(LOWER(:nome), :fromChars, :toChars)
-          )`, {
-                    nome: `%${filterDto.nome_razao_social.trim()}%`,
-                    fromChars,
-                    toChars
-                });
+                queryBuilder.andWhere(`(${(0, pg_unaccent_search_1.pgWhereUnaccentContains)(`COALESCE(lead.nome_razao_social, '')`, 'nome')} OR ${(0, pg_unaccent_search_1.pgWhereUnaccentContains)(`COALESCE(lead.nome_fantasia_apelido, '')`, 'nome')})`, { nome: `%${filterDto.nome_razao_social.trim()}%` });
             }
             if (filterDto.email) {
-                queryBuilder.andWhere('LOWER(lead.email) ILIKE LOWER(:email)', { email: `%${filterDto.email.trim()}%` });
+                queryBuilder.andWhere((0, pg_unaccent_search_1.pgWhereUnaccentContains)('COALESCE(lead.email, \'\')', 'email'), {
+                    email: `%${filterDto.email.trim()}%`,
+                });
             }
             if (filterDto.telefone) {
                 const telefoneNumeros = filterDto.telefone.trim().replace(/\D/g, '');

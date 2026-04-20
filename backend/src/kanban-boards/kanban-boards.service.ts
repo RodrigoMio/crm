@@ -23,6 +23,7 @@ import { Occurrence, OccurrenceType } from '../occurrences/entities/occurrence.e
 import { OccurrencesService } from '../occurrences/occurrences.service';
 import { LeadsProduto } from '../leads-produtos/entities/leads-produto.entity';
 import { Produto } from '../produtos/entities/produto.entity';
+import { pgWhereUnaccentContains } from '../database/pg-unaccent-search';
 
 // Enum TipoFluxo (temporário até encontrar a entidade)
 export enum TipoFluxo {
@@ -201,8 +202,8 @@ export class KanbanBoardsService {
     }
 
     if (filterDto.nome) {
-      queryBuilder.andWhere('board.nome ILIKE :nome', {
-        nome: `%${filterDto.nome}%`,
+      queryBuilder.andWhere(pgWhereUnaccentContains('COALESCE(board.nome, \'\')', 'nomeBoard'), {
+        nomeBoard: `%${filterDto.nome.trim()}%`,
       });
     }
 
@@ -1161,29 +1162,20 @@ export class KanbanBoardsService {
 
       // Filtro por nome/razão social
       if (filterDto.nome_razao_social) {
-        const fromChars = 'áàâãäéèêëíìîïóòôõöúùûüçñýÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑÝ';
-        const toChars = 'aaaaaeeeeiiiiooooouuuucnyAAAAAEEEEIIIIOOOOOUUUUCNY';
-        
         queryBuilder.andWhere(
-          `(
-            translate(LOWER(lead.nome_razao_social), :fromChars, :toChars) ILIKE translate(LOWER(:nome), :fromChars, :toChars)
-            OR 
-            translate(LOWER(lead.nome_fantasia_apelido), :fromChars, :toChars) ILIKE translate(LOWER(:nome), :fromChars, :toChars)
-          )`,
-          { 
-            nome: `%${filterDto.nome_razao_social.trim()}%`,
-            fromChars,
-            toChars
-          }
+          `(${pgWhereUnaccentContains(`COALESCE(lead.nome_razao_social, '')`, 'nome')} OR ${pgWhereUnaccentContains(
+            `COALESCE(lead.nome_fantasia_apelido, '')`,
+            'nome',
+          )})`,
+          { nome: `%${filterDto.nome_razao_social.trim()}%` },
         );
       }
 
       // Filtro por email (busca parcial, case-insensitive)
       if (filterDto.email) {
-        queryBuilder.andWhere(
-          'LOWER(lead.email) ILIKE LOWER(:email)',
-          { email: `%${filterDto.email.trim()}%` }
-        );
+        queryBuilder.andWhere(pgWhereUnaccentContains('COALESCE(lead.email, \'\')', 'email'), {
+          email: `%${filterDto.email.trim()}%`,
+        });
       }
 
       // Filtro por telefone (busca parcial, apenas números)
@@ -1691,28 +1683,19 @@ export class KanbanBoardsService {
 
       // Aplica filtros adicionais (mesma lógica do getLeadsByBoard)
       if (filterDto.nome_razao_social) {
-        const fromChars = 'áàâãäéèêëíìîïóòôõöúùûüçñýÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑÝ';
-        const toChars = 'aaaaaeeeeiiiiooooouuuucnyAAAAAEEEEIIIIOOOOOUUUUCNY';
-        
         queryBuilder.andWhere(
-          `(
-            translate(LOWER(lead.nome_razao_social), :fromChars, :toChars) ILIKE translate(LOWER(:nome), :fromChars, :toChars)
-            OR 
-            translate(LOWER(lead.nome_fantasia_apelido), :fromChars, :toChars) ILIKE translate(LOWER(:nome), :fromChars, :toChars)
-          )`,
-          { 
-            nome: `%${filterDto.nome_razao_social.trim()}%`,
-            fromChars,
-            toChars
-          }
+          `(${pgWhereUnaccentContains(`COALESCE(lead.nome_razao_social, '')`, 'nome')} OR ${pgWhereUnaccentContains(
+            `COALESCE(lead.nome_fantasia_apelido, '')`,
+            'nome',
+          )})`,
+          { nome: `%${filterDto.nome_razao_social.trim()}%` },
         );
       }
 
       if (filterDto.email) {
-        queryBuilder.andWhere(
-          'LOWER(lead.email) ILIKE LOWER(:email)',
-          { email: `%${filterDto.email.trim()}%` }
-        );
+        queryBuilder.andWhere(pgWhereUnaccentContains('COALESCE(lead.email, \'\')', 'email'), {
+          email: `%${filterDto.email.trim()}%`,
+        });
       }
 
       if (filterDto.telefone) {

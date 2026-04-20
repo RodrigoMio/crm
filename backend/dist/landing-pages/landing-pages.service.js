@@ -371,6 +371,7 @@ let LandingPagesService = class LandingPagesService {
             }
         }
         await this.leadsRepository.manager.transaction(async (manager) => {
+            const tipoFluxoKanban = (landingPage.tipo_fluxo || 'COMPRADOR');
             const lead = manager.create(lead_entity_1.Lead, {
                 data_entrada: new Date(),
                 nome_razao_social: dto.nome.trim(),
@@ -384,12 +385,13 @@ let LandingPagesService = class LandingPagesService {
                 lgpd_data_aceite: new Date(dto.lgpd_data_aceite),
                 lgpd_ip_origem: this.extractIp(req?.ip || ''),
                 lgpd_versao_texto: dto.lgpd_versao_texto,
-                tipo_lead: landingPage.tipo_fluxo ? [landingPage.tipo_fluxo] : null,
+                tipo_lead: landingPage.tipo_fluxo ? [landingPage.tipo_fluxo] : landingPage.vendedor_id ? [tipoFluxoKanban] : null,
                 municipio: dto.municipio?.trim() || null,
                 uf: dto.uf?.trim()?.toUpperCase() || null,
             });
+            let savedLead;
             try {
-                await manager.save(lead_entity_1.Lead, lead);
+                savedLead = await manager.save(lead_entity_1.Lead, lead);
             }
             catch (error) {
                 if (error?.constraint === 'leads_origem_lead_check') {
@@ -397,11 +399,22 @@ let LandingPagesService = class LandingPagesService {
                 }
                 throw error;
             }
+            if (landingPage.vendedor_id != null) {
+                await manager.query(`INSERT INTO lead_kanban_status
+           (lead_id, tipo_fluxo, vendedor_id, usuario_id_colaborador, kanban_status_id, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`, [
+                    savedLead.id,
+                    tipoFluxoKanban,
+                    landingPage.vendedor_id,
+                    landingPage.usuario_id_colaborador ?? null,
+                    null,
+                ]);
+            }
             if (productIds.length > 0) {
                 const existing = await manager
                     .getRepository(leads_produto_entity_1.LeadsProduto)
                     .createQueryBuilder('lp')
-                    .where('lp.leads_id = :leadId', { leadId: lead.id || lead.leads_id || lead['leads_id'] })
+                    .where('lp.leads_id = :leadId', { leadId: savedLead.id })
                     .andWhere('lp.produto_id IN (:...ids)', { ids: productIds })
                     .getMany();
                 const existingIds = new Set(existing.map((e) => e.produto_id));
@@ -409,7 +422,7 @@ let LandingPagesService = class LandingPagesService {
                 for (const pid of productIds) {
                     if (!existingIds.has(pid)) {
                         toInsert.push({
-                            leads_id: lead.id || lead.leads_id || lead['leads_id'],
+                            leads_id: savedLead.id,
                             produto_id: pid,
                             insert_by_lead: true,
                         });

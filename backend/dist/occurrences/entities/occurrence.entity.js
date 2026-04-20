@@ -19,6 +19,11 @@ var OccurrenceType;
     OccurrenceType["USUARIO"] = "USUARIO";
 })(OccurrenceType || (exports.OccurrenceType = OccurrenceType = {}));
 let Occurrence = class Occurrence {
+    ensureCreatedAt() {
+        if (this.created_at == null) {
+            this.created_at = new Date();
+        }
+    }
 };
 exports.Occurrence = Occurrence;
 __decorate([
@@ -68,6 +73,12 @@ __decorate([
     (0, typeorm_1.CreateDateColumn)({ name: 'created_at', type: 'timestamptz' }),
     __metadata("design:type", Date)
 ], Occurrence.prototype, "created_at", void 0);
+__decorate([
+    (0, typeorm_1.BeforeInsert)(),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], Occurrence.prototype, "ensureCreatedAt", null);
 exports.Occurrence = Occurrence = __decorate([
     (0, typeorm_1.Entity)('occurrences')
 ], Occurrence);

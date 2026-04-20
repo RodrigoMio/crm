@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
+  BeforeInsert,
 } from 'typeorm';
 import { Lead } from '../../leads/entities/lead.entity';
 import { User } from '../../users/entities/user.entity';
@@ -53,4 +54,15 @@ export class Occurrence {
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   created_at: Date;
+
+  /**
+   * Garante timestamp em todo insert (inclui saves via QueryRunner em transação),
+   * caso o banco não tenha DEFAULT ou o ORM omita a coluna no INSERT.
+   */
+  @BeforeInsert()
+  ensureCreatedAt(): void {
+    if (this.created_at == null) {
+      this.created_at = new Date();
+    }
+  }
 }

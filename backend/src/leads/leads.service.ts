@@ -10,6 +10,11 @@ import { Produto } from '../produtos/entities/produto.entity';
 import { Ocorrencia } from '../ocorrencias/entities/ocorrencia.entity';
 import { LeadOcorrencia } from '../lead-ocorrencias/entities/lead-ocorrencia.entity';
 import { LeadsProduto } from '../leads-produtos/entities/leads-produto.entity';
+import {
+  pgWhereUnaccentContains,
+  pgWhereUnaccentEquals,
+  pgWhereUnaccentIn,
+} from '../database/pg-unaccent-search';
 
 @Injectable()
 export class LeadsService {
@@ -37,6 +42,17 @@ export class LeadsService {
       return parseInt(id, 10);
     }
     return Number(id);
+  }
+
+  /** Chave alinhada à busca `unaccent(lower(...))` no Postgres (PT-BR) para caches de importação. */
+  private accentInsensitiveKey(text: string): string {
+    return (text || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/ç/g, 'c')
+      .replace(/ñ/g, 'n');
   }
 
   /**
@@ -256,25 +272,16 @@ export class LeadsService {
     // Filtro por nome/razão social (busca parcial, case-insensitive e sem acentos)
     // Normaliza acentos para buscar "Jose" e encontrar "José", "João" e encontrar "Joao"
     if (filterDto.nome_razao_social) {
-      const fromChars = 'áàâãäéèêëíìîïóòôõöúùûüçñýÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑÝ';
-      const toChars = 'aaaaaeeeeiiiiooooouuuucnyAAAAAEEEEIIIIOOOOOUUUUCNY';
-      
-      queryBuilder.andWhere(
-        `translate(LOWER(lead.nome_razao_social), :fromChars, :toChars) ILIKE translate(LOWER(:nome), :fromChars, :toChars)`,
-        { 
-          nome: `%${filterDto.nome_razao_social.trim()}%`,
-          fromChars,
-          toChars
-        },
-      );
+      queryBuilder.andWhere(pgWhereUnaccentContains('COALESCE(lead.nome_razao_social, \'\')', 'nome'), {
+        nome: `%${filterDto.nome_razao_social.trim()}%`,
+      });
     }
 
     // Filtro por email (busca parcial, case-insensitive)
     if (filterDto.email) {
-      queryBuilder.andWhere(
-        'LOWER(lead.email) ILIKE LOWER(:email)',
-        { email: `%${filterDto.email.trim()}%` }
-      );
+      queryBuilder.andWhere(pgWhereUnaccentContains('COALESCE(lead.email, \'\')', 'email'), {
+        email: `%${filterDto.email.trim()}%`,
+      });
     }
 
     // Filtro por telefone (busca parcial, apenas números)
@@ -649,7 +656,7 @@ export class LeadsService {
     // Busca case-insensitive
     const produto = await manager
       .createQueryBuilder(Produto, 'produto')
-      .where('LOWER(produto.descricao) = LOWER(:descricao)', { descricao: descricaoNormalizada })
+      .where(pgWhereUnaccentEquals('produto.descricao', 'descricao'), { descricao: descricaoNormalizada })
       .getOne();
 
     if (produto) {
@@ -673,7 +680,7 @@ export class LeadsService {
     // Busca case-insensitive
     const ocorrencia = await manager
       .createQueryBuilder(Ocorrencia, 'ocorrencia')
-      .where('LOWER(ocorrencia.descricao) = LOWER(:descricao)', { descricao: descricaoNormalizada })
+      .where(pgWhereUnaccentEquals('ocorrencia.descricao', 'descricao'), { descricao: descricaoNormalizada })
       .getOne();
 
     if (ocorrencia) {
@@ -943,19 +950,19 @@ export class LeadsService {
       if (!produtoFinal) continue;
 
       // Usa cache para buscar ocorrência (já foi criada no pré-processamento se não existia)
-      let ocorrencia = ocorrenciasCache.get(descricaoOcorrencia.toLowerCase());
+      let ocorrencia = ocorrenciasCache.get(this.accentInsensitiveKey(descricaoOcorrencia));
       if (!ocorrencia) {
         // Fallback: se não está no cache, cria e adiciona ao cache
         ocorrencia = await this.findOrCreateOcorrencia(manager, descricaoOcorrencia);
-        ocorrenciasCache.set(descricaoOcorrencia.toLowerCase(), ocorrencia);
+        ocorrenciasCache.set(this.accentInsensitiveKey(descricaoOcorrencia), ocorrencia);
       }
 
       // Usa cache para buscar produto (já foi criado no pré-processamento se não existia)
-      let produto = produtosCache.get(produtoFinal.toLowerCase());
+      let produto = produtosCache.get(this.accentInsensitiveKey(produtoFinal));
       if (!produto) {
         // Fallback: se não está no cache, cria e adiciona ao cache
         produto = await this.findOrCreateProduto(manager, produtoFinal);
-        produtosCache.set(produtoFinal.toLowerCase(), produto);
+        produtosCache.set(this.accentInsensitiveKey(produtoFinal), produto);
       }
 
       const data = this.parseOcorrenciaDate(dataString);
@@ -1004,11 +1011,11 @@ export class LeadsService {
 
     // Para cada tag, usa cache para buscar produto
     for (const tag of tags) {
-      let produto = produtosCache.get(tag.toLowerCase());
+      let produto = produtosCache.get(this.accentInsensitiveKey(tag));
       if (!produto) {
         // Fallback: se não está no cache, cria e adiciona ao cache
         produto = await this.findOrCreateProduto(manager, tag);
-        produtosCache.set(tag.toLowerCase(), produto);
+        produtosCache.set(this.accentInsensitiveKey(tag), produto);
       }
       await this.findOrCreateLeadsProduto(manager, leadId, produto.produto_id);
     }
@@ -1163,17 +1170,17 @@ export class LeadsService {
     if (produtosUnicos.size > 0) {
       const produtosExistentes = await this.produtoRepository
         .createQueryBuilder('produto')
-        .where('LOWER(produto.descricao) IN (:...descricoes)', {
-          descricoes: Array.from(produtosUnicos).map(p => p.toLowerCase()),
+        .where(pgWhereUnaccentIn('produto.descricao', 'descricoes'), {
+          descricoes: Array.from(produtosUnicos),
         })
         .getMany();
       produtosExistentes.forEach(p => {
-        produtosCache.set(p.descricao.toLowerCase(), p);
+        produtosCache.set(this.accentInsensitiveKey(p.descricao), p);
       });
 
       // Cria produtos que não existem (em uma única transação)
       const produtosParaCriar = Array.from(produtosUnicos).filter(
-        p => !produtosCache.has(p.toLowerCase())
+        p => !produtosCache.has(this.accentInsensitiveKey(p))
       );
       
       if (produtosParaCriar.length > 0) {
@@ -1182,7 +1189,7 @@ export class LeadsService {
         );
         const produtosCriados = await this.produtoRepository.save(novosProdutos);
         produtosCriados.forEach(p => {
-          produtosCache.set(p.descricao.toLowerCase(), p);
+          produtosCache.set(this.accentInsensitiveKey(p.descricao), p);
         });
       }
     }
@@ -1191,17 +1198,17 @@ export class LeadsService {
     if (ocorrenciasUnicas.size > 0) {
       const ocorrenciasExistentes = await this.ocorrenciaRepository
         .createQueryBuilder('ocorrencia')
-        .where('LOWER(ocorrencia.descricao) IN (:...descricoes)', {
-          descricoes: Array.from(ocorrenciasUnicas).map(o => o.toLowerCase()),
+        .where(pgWhereUnaccentIn('ocorrencia.descricao', 'descricoes'), {
+          descricoes: Array.from(ocorrenciasUnicas),
         })
         .getMany();
       ocorrenciasExistentes.forEach(o => {
-        ocorrenciasCache.set(o.descricao.toLowerCase(), o);
+        ocorrenciasCache.set(this.accentInsensitiveKey(o.descricao), o);
       });
 
       // Cria ocorrências que não existem (em uma única transação)
       const ocorrenciasParaCriar = Array.from(ocorrenciasUnicas).filter(
-        o => !ocorrenciasCache.has(o.toLowerCase())
+        o => !ocorrenciasCache.has(this.accentInsensitiveKey(o))
       );
       
       if (ocorrenciasParaCriar.length > 0) {
@@ -1210,7 +1217,7 @@ export class LeadsService {
         );
         const ocorrenciasCriadas = await this.ocorrenciaRepository.save(novasOcorrencias);
         ocorrenciasCriadas.forEach(o => {
-          ocorrenciasCache.set(o.descricao.toLowerCase(), o);
+          ocorrenciasCache.set(this.accentInsensitiveKey(o.descricao), o);
         });
       }
     }

@@ -37,6 +37,15 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
   }
 
   createTypeOrmOptions(): DataSourceOptions {
+    // Opcional: alinha a sessão do PostgreSQL a um fuso (ex.: America/Sao_Paulo).
+    // Útil no Railway quando o banco e o app estão em UTC mas a operação é no Brasil.
+    // Defina no Railway: DB_TIMEZONE=America/Sao_Paulo
+    const dbTimezone = this.getEnv('DB_TIMEZONE', '').trim();
+    const extra =
+      dbTimezone.length > 0
+        ? { options: `-c TimeZone=${dbTimezone}` }
+        : undefined;
+
     return {
       type: 'postgres',
       host: this.getEnv('DB_HOST', 'localhost'),
@@ -44,6 +53,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       username: this.getEnv('DB_USERNAME', 'postgres'),
       password: this.getEnv('DB_PASSWORD', 'postgres'),
       database: this.getEnv('DB_DATABASE', 'crm_leads'),
+      ...(extra ? { extra } : {}),
       entities: [
         User,
         Lead,

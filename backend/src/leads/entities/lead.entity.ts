@@ -1,13 +1,14 @@
 import {
   Entity,
   PrimaryGeneratedColumn,
-  PrimaryColumn,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
   OneToMany,
+  BeforeInsert,
+  BeforeUpdate,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { KanbanStatus } from '../../kanban-modelos/entities/kanban-status.entity';
@@ -139,4 +140,20 @@ export class Lead {
 
   @UpdateDateColumn()
   updated_at: Date;
+
+  @BeforeInsert()
+  ensureTimestampsOnInsert(): void {
+    const now = new Date();
+    if (this.created_at == null) {
+      this.created_at = now;
+    }
+    if (this.updated_at == null) {
+      this.updated_at = now;
+    }
+  }
+
+  @BeforeUpdate()
+  ensureUpdatedAtOnUpdate(): void {
+    this.updated_at = new Date();
+  }
 }

@@ -52,6 +52,18 @@ var OrigemLead;
     OrigemLead["BASE_CANAL_DO_CAMPO"] = "BASE_CANAL_DO_CAMPO";
 })(OrigemLead || (exports.OrigemLead = OrigemLead = {}));
 let Lead = class Lead {
+    ensureTimestampsOnInsert() {
+        const now = new Date();
+        if (this.created_at == null) {
+            this.created_at = now;
+        }
+        if (this.updated_at == null) {
+            this.updated_at = now;
+        }
+    }
+    ensureUpdatedAtOnUpdate() {
+        this.updated_at = new Date();
+    }
 };
 exports.Lead = Lead;
 __decorate([
@@ -157,6 +169,18 @@ __decorate([
     (0, typeorm_1.UpdateDateColumn)(),
     __metadata("design:type", Date)
 ], Lead.prototype, "updated_at", void 0);
+__decorate([
+    (0, typeorm_1.BeforeInsert)(),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], Lead.prototype, "ensureTimestampsOnInsert", null);
+__decorate([
+    (0, typeorm_1.BeforeUpdate)(),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], Lead.prototype, "ensureUpdatedAtOnUpdate", null);
 exports.Lead = Lead = __decorate([
     (0, typeorm_1.Entity)('leads')
 ], Lead);

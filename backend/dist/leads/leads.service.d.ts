@@ -18,6 +18,7 @@ export declare class LeadsService {
     private dataSource;
     constructor(leadsRepository: Repository<Lead>, usersRepository: Repository<User>, produtoRepository: Repository<Produto>, ocorrenciaRepository: Repository<Ocorrencia>, leadOcorrenciaRepository: Repository<LeadOcorrencia>, leadsProdutoRepository: Repository<LeadsProduto>, dataSource: DataSource);
     private normalizeId;
+    private accentInsensitiveKey;
     create(createLeadDto: CreateLeadDto, currentUser: User): Promise<Lead>;
     getMaxId(): Promise<number | null>;
     findAvailableOrigens(currentUser: User): Promise<string[]>;

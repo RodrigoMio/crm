@@ -44,6 +44,10 @@ let DatabaseConfig = class DatabaseConfig {
         return process.env[key] ? parseInt(process.env[key], 10) : defaultValue;
     }
     createTypeOrmOptions() {
+        const dbTimezone = this.getEnv('DB_TIMEZONE', '').trim();
+        const extra = dbTimezone.length > 0
+            ? { options: `-c TimeZone=${dbTimezone}` }
+            : undefined;
         return {
             type: 'postgres',
             host: this.getEnv('DB_HOST', 'localhost'),
@@ -51,6 +55,7 @@ let DatabaseConfig = class DatabaseConfig {
             username: this.getEnv('DB_USERNAME', 'postgres'),
             password: this.getEnv('DB_PASSWORD', 'postgres'),
             database: this.getEnv('DB_DATABASE', 'crm_leads'),
+            ...(extra ? { extra } : {}),
             entities: [
                 user_entity_1.User,
                 lead_entity_1.Lead,
