@@ -144,16 +144,23 @@ async function bootstrap() {
     }
     const port = parseInt(process.env.PORT_SERVER || process.env.PORT || '3001', 10);
     const host = process.env.HOST || '0.0.0.0';
-    const portAvailable = await isPortAvailable(port);
-    if (!portAvailable) {
-        console.error(`\n❌ ERRO: A porta ${port} já está em uso!`);
-        console.error(`\n💡 Soluções:`);
-        console.error(`   1. Execute: npm run kill-port (no diretório backend)`);
-        console.error(`   2. Ou encerre manualmente o processo:`);
-        console.error(`      Windows: netstat -ano | findstr :${port}`);
-        console.error(`      Depois: taskkill /PID <PID> /F`);
-        console.error(`   3. Ou use outra porta definindo PORT=3002 no .env\n`);
-        process.exit(1);
+    const skipPortProbe = Boolean(process.env.PORT) ||
+        Boolean(process.env.RAILWAY_ENVIRONMENT) ||
+        Boolean(process.env.RAILWAY_PROJECT_ID) ||
+        Boolean(process.env.FLY_APP_NAME) ||
+        Boolean(process.env.RENDER);
+    if (!skipPortProbe) {
+        const portAvailable = await isPortAvailable(port);
+        if (!portAvailable) {
+            console.error(`\n❌ ERRO: A porta ${port} já está em uso!`);
+            console.error(`\n💡 Soluções:`);
+            console.error(`   1. Execute: npm run kill-port (no diretório backend)`);
+            console.error(`   2. Ou encerre manualmente o processo:`);
+            console.error(`      Windows: netstat -ano | findstr :${port}`);
+            console.error(`      Depois: taskkill /PID <PID> /F`);
+            console.error(`   3. Ou use outra porta definindo PORT=3002 no .env\n`);
+            process.exit(1);
+        }
     }
     try {
         await app.listen(port, host);

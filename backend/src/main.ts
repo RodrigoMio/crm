@@ -192,20 +192,30 @@ async function bootstrap() {
   // Usa PORT_SERVER (KingHost) ou PORT (padrão) ou 3001 como fallback
   const port = parseInt(process.env.PORT_SERVER || process.env.PORT || '3001', 10);
   const host = process.env.HOST || '0.0.0.0'; // 0.0.0.0 permite acesso de qualquer IP na rede
-  
-  // Verifica se a porta está disponível antes de tentar iniciar
-  const portAvailable = await isPortAvailable(port);
-  if (!portAvailable) {
-    console.error(`\n❌ ERRO: A porta ${port} já está em uso!`);
-    console.error(`\n💡 Soluções:`);
-    console.error(`   1. Execute: npm run kill-port (no diretório backend)`);
-    console.error(`   2. Ou encerre manualmente o processo:`);
-    console.error(`      Windows: netstat -ano | findstr :${port}`);
-    console.error(`      Depois: taskkill /PID <PID> /F`);
-    console.error(`   3. Ou use outra porta definindo PORT=3002 no .env\n`);
-    process.exit(1);
+
+  // Railway / Render / Fly etc. injetam PORT e o proxy já roteia; checar porta com net.createServer
+  // pode falhar em falso positivo ou competir com health checks → 502 no edge. Só checa em dev local.
+  const skipPortProbe =
+    Boolean(process.env.PORT) ||
+    Boolean(process.env.RAILWAY_ENVIRONMENT) ||
+    Boolean(process.env.RAILWAY_PROJECT_ID) ||
+    Boolean(process.env.FLY_APP_NAME) ||
+    Boolean(process.env.RENDER);
+
+  if (!skipPortProbe) {
+    const portAvailable = await isPortAvailable(port);
+    if (!portAvailable) {
+      console.error(`\n❌ ERRO: A porta ${port} já está em uso!`);
+      console.error(`\n💡 Soluções:`);
+      console.error(`   1. Execute: npm run kill-port (no diretório backend)`);
+      console.error(`   2. Ou encerre manualmente o processo:`);
+      console.error(`      Windows: netstat -ano | findstr :${port}`);
+      console.error(`      Depois: taskkill /PID <PID> /F`);
+      console.error(`   3. Ou use outra porta definindo PORT=3002 no .env\n`);
+      process.exit(1);
+    }
   }
-  
+
   try {
     await app.listen(port, host);
     console.log(`🚀 Backend rodando na porta ${port}`);
