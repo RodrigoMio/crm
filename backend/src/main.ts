@@ -5,6 +5,28 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import * as net from 'net';
 
+/** Railway/Raw Editor: aspas no valor da variável quebram parseInt. */
+function parseEnvPort(key: string): number | null {
+  const raw = (process.env[key] ?? '').trim().replace(/^["']|["']$/g, '');
+  if (!raw) {
+    return null;
+  }
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function stripEnvQuotes(value: string | undefined): string | undefined {
+  if (value == null) {
+    return undefined;
+  }
+  const t = value.trim().replace(/^["']|["']$/g, '');
+  return t.length > 0 ? t : undefined;
+}
+
+function isRailwayLike(): boolean {
+  return Boolean(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID);
+}
+
 // Função auxiliar para verificar se a porta está disponível
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -115,7 +137,7 @@ async function bootstrap() {
   
   const possibleFrontendPaths = [
     // Caminho absoluto se definido em variável de ambiente (PRIORIDADE MÁXIMA)
-    process.env.FRONTEND_DIST_PATH,
+    stripEnvQuotes(process.env.FRONTEND_DIST_PATH),
     // Caminhos específicos da estrutura apps_nodejs/crm (PRIORIDADE ALTA)
     '/apps_nodejs/crm/frontend/dist',
     '/home/crmcc/apps_nodejs/crm/frontend/dist',
@@ -192,10 +214,15 @@ async function bootstrap() {
     console.warn('💡 Defina FRONTEND_DIST_PATH no .env com o caminho absoluto do frontend/dist');
   }
   
-  // Railway/Render/Fly injetam PORT — o proxy só encaminha para essa porta.
+  // Railway/Render/Fly: PORT deve coincidir com a porta mapeada em Networking no painel.
   // KingHost legado: só PORT_SERVER (sem PORT). Se ambos existirem, PORT ganha (evita 502).
-  const port = parseInt(process.env.PORT || process.env.PORT_SERVER || '3001', 10);
-  const host = process.env.HOST || '0.0.0.0'; // 0.0.0.0 permite acesso de qualquer IP na rede
+  const port = parseEnvPort('PORT') ?? parseEnvPort('PORT_SERVER') ?? 3001;
+  const hostFromEnv = (process.env.HOST ?? '0.0.0.0').trim().replace(/^["']|["']$/g, '') || '0.0.0.0';
+  // Igual ao exemplo típico PaaS: o proxy fala com o container em 0.0.0.0, não só em localhost.
+  const listenHost = isRailwayLike() ? '0.0.0.0' : hostFromEnv;
+  if (listenHost !== hostFromEnv) {
+    console.log(`[bootstrap] Railway: ignorando HOST=${hostFromEnv} → escuta em 0.0.0.0`);
+  }
 
   // Railway / Render / Fly etc. injetam PORT e o proxy já roteia; checar porta com net.createServer
   // pode falhar em falso positivo ou competir com health checks → 502 no edge. Só checa em dev local.
@@ -221,8 +248,8 @@ async function bootstrap() {
   }
 
   try {
-    console.log(`[bootstrap] Escutando em ${host}:${port}...`);
-    await app.listen(port, host);
+    console.log(`[bootstrap] Escutando em ${listenHost}:${port} (PORT env)...`);
+    await app.listen(port, listenHost);
     console.log(`🚀 Backend rodando na porta ${port}`);
     console.log(`📡 API disponível em http://localhost:${port}/api`);
     console.log(`🌐 Acessível na rede em http://[SEU_IP]:${port}/api`);
@@ -240,7 +267,10 @@ async function bootstrap() {
   }
 }
 
-bootstrap();
+bootstrap().catch((err: unknown) => {
+  console.error('[bootstrap] falha:', err);
+  process.exit(1);
+});
 
 
 

@@ -1,0 +1,15 @@
+# Monorepo CRM: garante Node/npm no plano de build (evita "npm: command not found"
+# quando um buildCommand solto no railway.toml vira RUN sem o ambiente Nix).
+# https://nixpacks.com/docs/configuration/file
+
+providers = ["node"]
+
+[variables]
+NPM_CONFIG_PRODUCTION = "false"
+
+[phases.install]
+cmds = ["npm run install:all"]
+
+[phases.build]
+dependsOn = ["install"]
+cmds = ["npm run build"]
