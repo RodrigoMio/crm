@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# Preferir na Railway: node scripts/railway-start.cjs (evita CRLF / sh em imagens mínimas).
 # Start na Railway com diagnóstico mínimo (Deploy Logs costuma ficar vazio se o processo morre cedo).
 set -e
 echo "[railway-start] $(date -u +%Y-%m-%dT%H:%M:%SZ) pwd=$(pwd)"

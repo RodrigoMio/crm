@@ -13,3 +13,7 @@ cmds = ["npm run install:all"]
 [phases.build]
 dependsOn = ["install"]
 cmds = ["npm run build"]
+
+# CMD da imagem final (alinha com railway.toml deploy).
+[start]
+cmd = "node scripts/railway-start.cjs"

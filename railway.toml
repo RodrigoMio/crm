@@ -2,4 +2,4 @@
 # Não use buildCommand aqui — no Nixpacks atual pode gerar RUN sem npm no PATH.
 
 [deploy]
-startCommand = "sh scripts/railway-start.sh"
+startCommand = "node scripts/railway-start.cjs"
