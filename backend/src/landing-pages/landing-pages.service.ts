@@ -451,18 +451,6 @@ export class LandingPagesService {
       throw new BadRequestException('Essa landing page não está ativa');
     }
 
-    const phoneDigits = normalizedPhone.replace(/\D/g, '');
-    const existingPhone = await this.leadsRepository
-      .createQueryBuilder('lead')
-      .where(`REGEXP_REPLACE(COALESCE(lead.telefone, ''), '[^0-9]', '', 'g') = :phoneDigits`, {
-        phoneDigits,
-      })
-      .getOne();
-
-    if (existingPhone) {
-      throw new BadRequestException('Esse Telefone já foi registrado');
-    }
-
     // Validação de produtos vinculados à LP (se enviados)
     const productIds = Array.from(new Set(dto.products || [])).map((n) => Number(n)).filter(Boolean);
     if (productIds.length > 0) {
