@@ -3,4 +3,4 @@
 
 [deploy]
 #startCommand = "node scripts/railway-start.cjs"
-startCommand = "node node backend/dist/main.js"
+startCommand = "node backend/dist/main.js"
