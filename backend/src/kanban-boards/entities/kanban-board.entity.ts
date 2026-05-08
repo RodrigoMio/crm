@@ -22,11 +22,14 @@ export class KanbanBoard {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'varchar', length: 20 })
+  @Column({ type: 'varchar', length: 25 })
   nome: string;
 
   @Column({ type: 'varchar', length: 7, name: 'cor_hex' })
   cor_hex: string;
+
+  @Column({ type: 'varchar', length: 10, nullable: true, name: 'cor_fonte_hex' })
+  cor_fonte_hex: string | null;
 
   @Column({ type: 'integer', nullable: true, name: 'usuario_id_dono' })
   usuario_id_dono: number;

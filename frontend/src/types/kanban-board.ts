@@ -8,6 +8,7 @@ export interface KanbanBoard {
   id: number;
   nome: string;
   cor_hex: string;
+  cor_fonte_hex?: string;
   usuario_id_dono: number | null;
   agente_id: number | null;
   colaborador_id: number | null;
@@ -44,6 +45,8 @@ export interface CreateKanbanBoardDto {
 export interface UpdateKanbanBoardDto {
   nome?: string;
   cor_hex?: string;
+  cor_fonte_hex?: string;
+  limit_days?: number;
   ordem?: number;
 }
 

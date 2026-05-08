@@ -1,16 +1,21 @@
-import { IsString, IsNotEmpty, MaxLength, IsOptional, IsInt, IsEnum, IsHexColor } from 'class-validator';
+import { IsString, IsNotEmpty, MaxLength, IsOptional, IsInt, IsEnum, IsHexColor, Min, Max } from 'class-validator';
 import { KanbanBoardType } from '../entities/kanban-board.entity';
 
 export class CreateKanbanBoardDto {
   @IsString()
   @IsNotEmpty({ message: 'Nome é obrigatório' })
-  @MaxLength(20, { message: 'Nome não pode ter mais de 20 caracteres' })
+  @MaxLength(25, { message: 'Nome não pode ter mais de 25 caracteres' })
   nome: string;
 
   @IsString()
   @IsNotEmpty({ message: 'Cor é obrigatória' })
   @IsHexColor({ message: 'Cor deve estar no formato hexadecimal (#RRGGBB)' })
   cor_hex: string;
+
+  @IsOptional()
+  @IsString()
+  @IsHexColor({ message: 'Cor da fonte deve estar no formato hexadecimal (#RRGGBB)' })
+  cor_fonte_hex?: string;
 
   @IsOptional()
   @IsInt({ message: 'usuario_id_dono deve ser um número inteiro' })
@@ -42,4 +47,10 @@ export class CreateKanbanBoardDto {
   @IsOptional()
   @IsString()
   tipo_fluxo?: 'COMPRADOR' | 'VENDEDOR';
+
+  @IsOptional()
+  @IsInt({ message: 'limit_days deve ser um número inteiro' })
+  @Min(0, { message: 'limit_days deve ser no mínimo 0' })
+  @Max(360, { message: 'limit_days deve ser no máximo 360' })
+  limit_days?: number;
 }

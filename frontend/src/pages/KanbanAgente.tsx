@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-toastify'
 import { api } from '../services/api'
-import { BoardWithLeadsCount, CreateKanbanBoardDto, KanbanBoardType, MoveLeadDto } from '../types/kanban-board'
+import { BoardWithLeadsCount, CreateKanbanBoardDto, KanbanBoardType, MoveLeadDto, UpdateKanbanBoardDto } from '../types/kanban-board'
 import { Lead, FilterLeadsDto } from '../types/lead'
 import { useAuth } from '../contexts/AuthContext'
 import EditViewLeadModal from '../components/EditViewLeadModal'
@@ -48,6 +48,14 @@ export default function KanbanAgente() {
   const [selectedLeadForEditView, setSelectedLeadForEditView] = useState<Lead | null>(null)
   const [selectedLeadForSchedule, setSelectedLeadForSchedule] = useState<Lead | null>(null)
   const [openMenuLeadId, setOpenMenuLeadId] = useState<number | null>(null)
+  const [openBoardMenuId, setOpenBoardMenuId] = useState<number | null>(null)
+  const [editingBoard, setEditingBoard] = useState<BoardWithLeadsCount | null>(null)
+  const [editBoardForm, setEditBoardForm] = useState<UpdateKanbanBoardDto>({
+    nome: '',
+    cor_hex: '#ADF0C7',
+    cor_fonte_hex: '#000000',
+    limit_days: 0,
+  })
   // Removido currentPage global - cada board terá sua própria paginação
   const [showFiltersModal, setShowFiltersModal] = useState(false)
   const [availableTypes, setAvailableTypes] = useState<('COMPRADOR' | 'VENDEDOR')[]>([])
@@ -291,6 +299,12 @@ export default function KanbanAgente() {
       document.removeEventListener('click', handleClickOutside)
     }
   }, [openMenuLeadId])
+  useEffect(() => {
+    if (openBoardMenuId === null) return
+    const handleClickOutside = () => setOpenBoardMenuId(null)
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [openBoardMenuId])
   const [formData, setFormData] = useState<CreateKanbanBoardDto>({
     nome: '',
     cor_hex: '#ADF0C7',
@@ -521,6 +535,17 @@ export default function KanbanAgente() {
     },
   })
 
+  const editBoardMutation = useMutation({
+    mutationFn: async ({ boardId, data }: { boardId: number; data: UpdateKanbanBoardDto }) => {
+      return api.patch(`/kanban-boards/${boardId}`, data)
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['kanban-boards-agente'] })
+      setEditingBoard(null)
+      toast.success('Board atualizado com sucesso!')
+    },
+  })
+
   const moveLeadMutation = useMutation({
     mutationFn: async ({ leadId, fromBoardId, toBoardId }: { leadId: number; fromBoardId: number; toBoardId: number }) => {
       const moveDto: MoveLeadDto = { from_board_id: fromBoardId, to_board_id: toBoardId }
@@ -647,6 +672,34 @@ export default function KanbanAgente() {
       return
     }
     queryClient.invalidateQueries({ queryKey: getLeadsQueryKey() })
+  }
+
+  const handleEditBoardOpen = (board: BoardWithLeadsCount) => {
+    setEditingBoard(board)
+    setEditBoardForm({
+      nome: board.nome,
+      cor_hex: board.cor_hex,
+      cor_fonte_hex: board.cor_fonte_hex || '#000000',
+      limit_days: board.limit_days ?? 0,
+    })
+    setOpenBoardMenuId(null)
+  }
+
+  const handleSaveBoard = () => {
+    if (!editingBoard) return
+    if (!editBoardForm.nome?.trim()) {
+      toast.warning('Nome do board é obrigatório')
+      return
+    }
+    editBoardMutation.mutate({
+      boardId: editingBoard.id,
+      data: {
+        nome: editBoardForm.nome.trim(),
+        cor_hex: editBoardForm.cor_hex,
+        cor_fonte_hex: editBoardForm.cor_fonte_hex,
+        limit_days: Math.max(0, Math.min(360, editBoardForm.limit_days ?? 0)),
+      },
+    })
   }
 
 
@@ -933,81 +986,82 @@ export default function KanbanAgente() {
                 className="kanban-board-header"
                 style={{ backgroundColor: board.cor_hex }}
               >
-                <span className="board-name">{board.nome}</span>
-                <div>
-                  <button
-                    className="btn-add-lead"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setSelectedBoardForNewLead(board.id)
-                    }}
-                    title="Novo Lead"
-                  >
-                    +
-                  </button>
-                  {user?.perfil === 'ADMIN' && (
+                <div className="board-title-row">
+                  <div className="board-name" style={{ color: board.cor_fonte_hex || '#000000' }}>
+                    {board.nome}
+                  </div>
+                  <div className="board-count" style={{ color: board.cor_fonte_hex || '#000000', fontSize: '15px' }}>
+                    {hasAnyFilter && boardLeads[board.id]?.total !== undefined
+                      ? `${boardLeads[board.id].total} de ${board.leads_count || 0}`
+                      : board.leads_count || 0}
+                  </div>
+                  <div className="card-menu-container">
                     <button
-                      className="btn-export-leads"
-                      onClick={async (e) => {
-                      e.stopPropagation()
-                      try {
-                        const params = new URLSearchParams()
-                        if (filters.nome_razao_social) {
-                          params.append('nome_razao_social', filters.nome_razao_social)
-                        }
-                        if (filters.email) {
-                          params.append('email', filters.email)
-                        }
-                        if (filters.telefone) {
-                          params.append('telefone', filters.telefone)
-                        }
-                        if (filters.uf) {
-                          const ufs = Array.isArray(filters.uf) ? filters.uf : [filters.uf]
-                          ufs.forEach(uf => {
-                            params.append('uf', uf)
-                          })
-                        }
-                        if (filters.vendedor_id) {
-                          params.append('vendedor_id', filters.vendedor_id.toString())
-                        }
-                        if (filters.usuario_id_colaborador) {
-                          params.append('usuario_id_colaborador', filters.usuario_id_colaborador.toString())
-                        }
-                        if (filters.origem_lead) {
-                          params.append('origem_lead', filters.origem_lead)
-                        }
-                        if (filters.produtos && filters.produtos.length > 0) {
-                          filters.produtos.forEach(produtoId => {
-                            params.append('produtos', produtoId.toString())
-                          })
-                        }
-                        const response = await api.get(`/kanban-boards/${board.id}/leads/export?${params.toString()}`, {
-                          responseType: 'blob'
-                        })
-                        const url = window.URL.createObjectURL(new Blob([response.data]))
-                        const link = document.createElement('a')
-                        link.href = url
-                        link.setAttribute('download', `leads-${board.nome.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`)
-                        document.body.appendChild(link)
-                        link.click()
-                        link.remove()
-                        window.URL.revokeObjectURL(url)
-                        toast.success('Leads exportados com sucesso!')
-                      } catch (error: any) {
-                        console.error('Erro ao exportar leads:', error)
-                        toast.error(error.response?.data?.message || 'Erro ao exportar leads')
-                      }
-                    }}
-                    title="Exportar leads"
-                    disabled={!boardLeads[board.id]?.total || boardLeads[board.id].total === 0}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                      <line x1="9" y1="3" x2="9" y2="21"></line>
-                    <line x1="3" y1="9" x2="21" y2="9"></line>
-                  </svg>
+                      className="card-menu-icon"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setOpenBoardMenuId(openBoardMenuId === board.id ? null : board.id)
+                      }}
+                      title="Ações do board"
+                      style={{ opacity: 1, color: board.cor_fonte_hex || '#000000' }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="5" r="1"></circle>
+                        <circle cx="12" cy="12" r="1"></circle>
+                        <circle cx="12" cy="19" r="1"></circle>
+                      </svg>
                     </button>
-                  )}
+                    {openBoardMenuId === board.id && (
+                      <div className="card-menu-dropdown" onClick={(e) => e.stopPropagation()}>
+                        <button className="card-menu-item" onClick={() => setSelectedBoardForNewLead(board.id)}>Novo lead</button>
+                        {user?.perfil === 'ADMIN' && (
+                          <>
+                            <button
+                              className="card-menu-item"
+                              onClick={async () => {
+                                try {
+                                  const params = new URLSearchParams()
+                                  if (filters.nome_razao_social) params.append('nome_razao_social', filters.nome_razao_social)
+                                  if (filters.email) params.append('email', filters.email)
+                                  if (filters.telefone) params.append('telefone', filters.telefone)
+                                  if (filters.uf) {
+                                    const ufs = Array.isArray(filters.uf) ? filters.uf : [filters.uf]
+                                    ufs.forEach((uf) => params.append('uf', uf))
+                                  }
+                                  if (filters.vendedor_id) params.append('vendedor_id', filters.vendedor_id.toString())
+                                  if (filters.usuario_id_colaborador) params.append('usuario_id_colaborador', filters.usuario_id_colaborador.toString())
+                                  if (filters.origem_lead) params.append('origem_lead', filters.origem_lead)
+                                  if (filters.produtos && filters.produtos.length > 0) {
+                                    filters.produtos.forEach((produtoId) => params.append('produtos', produtoId.toString()))
+                                  }
+                                  const response = await api.get(`/kanban-boards/${board.id}/leads/export?${params.toString()}`, {
+                                    responseType: 'blob',
+                                  })
+                                  const url = window.URL.createObjectURL(new Blob([response.data]))
+                                  const link = document.createElement('a')
+                                  link.href = url
+                                  link.setAttribute('download', `leads-${board.nome.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`)
+                                  document.body.appendChild(link)
+                                  link.click()
+                                  link.remove()
+                                  window.URL.revokeObjectURL(url)
+                                  setOpenBoardMenuId(null)
+                                  toast.success('Leads exportados com sucesso!')
+                                } catch (error: any) {
+                                  console.error('Erro ao exportar leads:', error)
+                                  toast.error(error.response?.data?.message || 'Erro ao exportar leads')
+                                }
+                              }}
+                              disabled={!boardLeads[board.id]?.total || boardLeads[board.id].total === 0}
+                            >
+                              Exportar leads
+                            </button>
+                            <button className="card-menu-item" onClick={() => handleEditBoardOpen(board)}>Editar board</button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   {(() => {
                     const leads = boardLeads[board.id]?.data || [];
                     const hasExpiredLeads = (board.limit_days ?? 0) > 0 && leads.some(lead => isLeadExpired(lead, board));
@@ -1022,10 +1076,11 @@ export default function KanbanAgente() {
                           ? "Exibir todos os leads" 
                           : "Exibir somente expirados"}
                         style={{
-                          backgroundColor: expiredFilterActive.get(board.id) ? 'white' : 'transparent'
+                          backgroundColor: expiredFilterActive.get(board.id) ? 'white' : 'transparent',
+                          color: board.cor_fonte_hex || '#000000'
                         }}
                       >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff9800" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
                           <line x1="12" y1="9" x2="12" y2="13"></line>
                           <line x1="12" y1="17" x2="12.01" y2="17"></line>
@@ -1033,11 +1088,6 @@ export default function KanbanAgente() {
                       </button>
                     );
                   })()}
-                  <span className="board-count">
-                    {hasAnyFilter && boardLeads[board.id]?.total !== undefined
-                      ? `${boardLeads[board.id].total} de ${board.leads_count || 0}`
-                      : board.leads_count || 0}
-                  </span>
                 </div>
               </div>
               <div
@@ -1346,6 +1396,35 @@ export default function KanbanAgente() {
               <button className="btn-criar" onClick={handleCreateBoard}>
                 Criar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingBoard && (
+        <div className="modal-overlay" onClick={() => setEditingBoard(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>Editar board</h2>
+            <div className="form-group">
+              <label>Nome do Board</label>
+              <input type="text" maxLength={25} value={editBoardForm.nome || ''} onChange={(e) => setEditBoardForm((prev) => ({ ...prev, nome: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Cor do board</label>
+              <input type="color" value={editBoardForm.cor_hex || '#ADF0C7'} onChange={(e) => setEditBoardForm((prev) => ({ ...prev, cor_hex: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Cor da fonte</label>
+              <input type="color" value={editBoardForm.cor_fonte_hex || '#000000'} onChange={(e) => setEditBoardForm((prev) => ({ ...prev, cor_fonte_hex: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Limite de dias</label>
+              <input type="number" min={0} max={360} value={editBoardForm.limit_days ?? 0} onChange={(e) => setEditBoardForm((prev) => ({ ...prev, limit_days: Number(e.target.value || 0) }))} />
+              <small>Exibir alerta de inatividade de ocorrências após esse prazo.</small>
+            </div>
+            <div className="modal-actions">
+              <button className="btn-fechar" onClick={() => setEditingBoard(null)}>Fechar</button>
+              <button className="btn-criar" onClick={handleSaveBoard} disabled={editBoardMutation.isPending}>Salvar</button>
             </div>
           </div>
         </div>

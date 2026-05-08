@@ -11,31 +11,44 @@
 
 /* Layout específico para KanbanAgente - Título do board em linha separada */
 .kanban-board-header {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
   position: relative;
 }
 
 .board-name {
-  width: 100%;
+  width: auto;
   display: block;
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .board-count,
 .btn-delete-board {
-  align-self: flex-end;
+  align-self: center;
   margin-left: 0;
   font-weight: 400;
-  font-size: 12px;
+  font-size: 15px;
 }
 
-.kanban-board-header > div {
+.board-title-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 10px;
   width: 100%;
+  gap: 8px;
+}
+
+.board-title-row .board-name {
+  width: auto;
+  flex: 1;
+  min-width: 0;
+}
+
+.board-title-row .card-menu-container {
+  flex-shrink: 0;
 }
 
 /* Botão de adicionar lead - oculto por padrão, aparece no hover */

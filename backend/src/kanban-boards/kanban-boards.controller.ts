@@ -274,7 +274,11 @@ export class KanbanBoardsController {
     @Param('tipo') tipo: KanbanBoardType,
     @Body() updateOrderDto: UpdateOrderDto,
   ) {
-    return this.kanbanBoardsService.updateOrder(updateOrderDto.board_ids, tipo);
+    return this.kanbanBoardsService.updateOrder(
+      updateOrderDto.board_ids,
+      tipo,
+      updateOrderDto.tipo_fluxo,
+    );
   }
 
   /**

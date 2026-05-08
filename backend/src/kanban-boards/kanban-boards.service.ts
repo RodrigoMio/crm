@@ -48,6 +48,7 @@ export interface BoardWithLeadsCount {
   id: number;
   nome: string;
   cor_hex: string;
+  cor_fonte_hex: string | null;
   usuario_id_dono: number | null;
   agente_id: number | null;
   colaborador_id: number | null;
@@ -61,6 +62,7 @@ export interface BoardWithLeadsCount {
   updated_at: Date;
   leads_count: number;
   tipo_fluxo?: 'COMPRADOR' | 'VENDEDOR' | null;
+  limit_days?: number;
 }
 
 @Injectable()
@@ -1812,19 +1814,58 @@ export class KanbanBoardsService {
   async updateOrder(
     boardIds: number[],
     tipo: KanbanBoardType,
+    tipoFluxo?: 'COMPRADOR' | 'VENDEDOR',
   ): Promise<KanbanBoard[]> {
-    const boards = await this.kanbanBoardRepository.find({
-      where: { id: In(boardIds), tipo, active: true },
-    });
+    return await this.dataSource.transaction(async (manager) => {
+      const scopedBoardsQuery = manager
+        .createQueryBuilder(KanbanBoard, 'board')
+        .where('board.tipo = :tipo', { tipo })
+        .andWhere('board.active = :active', { active: true });
 
-    for (let i = 0; i < boardIds.length; i++) {
-      const board = boards.find((b) => b.id === boardIds[i]);
-      if (board) {
-        board.ordem = i;
+      // Mantém o escopo de ordenação coerente com a listagem do Kanban Admin.
+      if (tipo === KanbanBoardType.ADMIN && tipoFluxo) {
+        if (tipoFluxo === 'COMPRADOR') {
+          scopedBoardsQuery.andWhere(
+            '(board.tipo_fluxo = :tipoFluxo OR board.tipo_fluxo IS NULL)',
+            { tipoFluxo },
+          );
+        } else {
+          scopedBoardsQuery.andWhere('board.tipo_fluxo = :tipoFluxo', { tipoFluxo });
+        }
+      } else if (tipoFluxo) {
+        scopedBoardsQuery.andWhere('board.tipo_fluxo = :tipoFluxo', { tipoFluxo });
       }
-    }
 
-    return await this.kanbanBoardRepository.save(boards);
+      const scopedBoards = await scopedBoardsQuery.getMany();
+
+      if (scopedBoards.length === 0) {
+        throw new BadRequestException('Nenhum board encontrado para o contexto informado');
+      }
+
+      const scopedBoardIds = scopedBoards.map((board) => board.id).sort((a, b) => a - b);
+      const incomingBoardIds = [...boardIds].sort((a, b) => a - b);
+
+      // Garante atualização completa do contexto para evitar ordem parcial/inconsistente.
+      if (
+        scopedBoardIds.length !== incomingBoardIds.length ||
+        scopedBoardIds.some((id, index) => id !== incomingBoardIds[index])
+      ) {
+        throw new BadRequestException(
+          'A lista de board_ids deve conter todos os boards do contexto atual',
+        );
+      }
+
+      const boardById = new Map(scopedBoards.map((board) => [board.id, board]));
+
+      for (let i = 0; i < boardIds.length; i++) {
+        const board = boardById.get(boardIds[i]);
+        if (board) {
+          board.ordem = i;
+        }
+      }
+
+      return await manager.save(KanbanBoard, scopedBoards);
+    });
   }
 
   /**

@@ -1,4 +1,4 @@
-import { IsArray, IsInt, ArrayMinSize } from 'class-validator';
+import { IsArray, IsIn, IsInt, IsOptional, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateOrderDto {
@@ -7,6 +7,12 @@ export class UpdateOrderDto {
   @IsInt({ each: true, message: 'Cada board_id deve ser um número inteiro' })
   @Type(() => Number)
   board_ids: number[];
+
+  @IsOptional()
+  @IsIn(['COMPRADOR', 'VENDEDOR'], {
+    message: 'tipo_fluxo deve ser COMPRADOR ou VENDEDOR',
+  })
+  tipo_fluxo?: 'COMPRADOR' | 'VENDEDOR';
 }
 
 

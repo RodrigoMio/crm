@@ -71,6 +71,16 @@
   cursor: pointer;
   flex-shrink: 0;
   box-sizing: border-box;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kanban-board[data-board-drag-over="true"] {
+  transform: translateY(-4px);
+  box-shadow: 0 0 0 2px #3498db, 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.kanban-board[data-board-dragging="true"] {
+  opacity: 0.6;
 }
 
 .kanban-board-header {
@@ -81,11 +91,19 @@
   align-items: center;
   color: white;
   font-weight: bold;
+  cursor: grab;
+  user-select: none;
+}
+
+.kanban-board-header:active {
+  cursor: grabbing;
 }
 
 .board-name {
   flex: 1;
   color: #000000;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .board-count {
@@ -98,6 +116,27 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.board-title-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+}
+
+.board-title-row .board-name {
+  min-width: 0;
+}
+
+.board-title-row .board-count {
+  margin-left: auto;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.board-title-row .card-menu-container {
+  flex-shrink: 0;
 }
 
 /* Botão de adicionar lead - oculto por padrão, aparece no hover */
